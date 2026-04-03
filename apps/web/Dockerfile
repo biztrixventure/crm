@@ -3,11 +3,14 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
+# Force development mode during build to install devDependencies (vite, etc.)
+ENV NODE_ENV=development
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci || npm install
+# Install ALL dependencies (including devDependencies for build)
+RUN npm install
 
 # Copy source code
 COPY . .
