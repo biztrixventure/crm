@@ -1,13 +1,396 @@
-import { Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  PlusIcon,
+  SearchIcon,
+  SquarePenIcon as EditIcon,
+  UserRoundPlusIcon,
+  UsersIcon,
+  XIcon,
+  CheckIcon,
+} from 'lucide-animated';
+import api from '../../lib/axios';
+import { cn, formatDateTime, roleLabels } from '../../lib/utils';
+import { useAuthStore } from '../../store/auth';
+
+const roleOptions = [
+  'super_admin',
+  'readonly_admin',
+  'company_admin',
+  'closer',
+  'fronter',
+];
 
 export default function UsersPage() {
-  return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-400 to-blue-500 rounded-2xl flex items-center justify-center mb-4">
-        <Users className="w-8 h-8 text-white" />
+  const currentUser = useAuthStore((state) => state.user);
+  const [users, setUsers] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'fronter',
+    company_id: '',
+    is_active: true,
+  });
+
+  const canManage = currentUser?.role === 'super_admin' || currentUser?.role === 'company_admin';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canCreate = canManage;
+
+  const availableRoles = useMemo(() => {
+    if (isSuperAdmin) return roleOptions;
+    if (currentUser?.role === 'company_admin') return ['fronter'];
+    return [];
+  }, [isSuperAdmin, currentUser?.role]);
+
+  const requiresCompany = ['company_admin', 'fronter'].includes(formData.role);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    try {
+      const usersPromise = api.get('/users');
+      const companiesPromise = isSuperAdmin ? api.get('/companies') : Promise.resolve({ data: { companies: [] } });
+      const [usersRes, companiesRes] = await Promise.all([usersPromise, companiesPromise]);
+      setUsers(usersRes.data.users || []);
+      setCompanies(companiesRes.data.companies || []);
+    } catch (error) {
+      console.error('Failed to fetch users data:', error);
+      alert(error.response?.data?.error || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function resetForm() {
+    setFormData({
+      email: '',
+      password: '',
+      full_name: '',
+      role: currentUser?.role === 'company_admin' ? 'fronter' : 'fronter',
+      company_id: currentUser?.role === 'company_admin' ? currentUser?.companyId || '' : '',
+      is_active: true,
+    });
+    setEditingUser(null);
+    setShowModal(false);
+  }
+
+  function handleEdit(user) {
+    setEditingUser(user);
+    setFormData({
+      email: user.email || '',
+      password: '',
+      full_name: user.full_name || '',
+      role: user.role || 'fronter',
+      company_id: user.company_id || '',
+      is_active: user.is_active ?? true,
+    });
+    setShowModal(true);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    const payload = {
+      email: formData.email.trim(),
+      full_name: formData.full_name.trim(),
+      role: formData.role,
+      company_id: requiresCompany ? (formData.company_id || null) : null,
+      is_active: !!formData.is_active,
+    };
+
+    try {
+      if (editingUser) {
+        await api.patch(`/users/${editingUser.id}`, payload);
+      } else {
+        await api.post('/users', {
+          ...payload,
+          password: formData.password,
+        });
+      }
+      await fetchData();
+      resetForm();
+    } catch (error) {
+      console.error('Failed to save user:', error);
+      alert(error.response?.data?.error || 'Failed to save user');
+    }
+  }
+
+  async function toggleActive(user) {
+    try {
+      await api.patch(`/users/${user.id}`, { is_active: !user.is_active });
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to update user status:', error);
+      alert(error.response?.data?.error || 'Failed to update user status');
+    }
+  }
+
+  const filteredUsers = users.filter((u) => {
+    const q = searchTerm.toLowerCase();
+    const companyName = u.companies?.display_name || '';
+    return (
+      u.full_name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.role?.toLowerCase().includes(q) ||
+      companyName.toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-12 bg-cream-200 dark:bg-dark-800 rounded-xl w-64" />
+        <div className="h-64 bg-cream-200 dark:bg-dark-800 rounded-xl" />
       </div>
-      <h3 className="text-xl font-bold text-primary-800 mb-2">Users Management</h3>
-      <p className="text-primary-600">Coming soon - Manage all system users</p>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-700 to-primary-500 dark:from-primary-400 dark:to-primary-300 bg-clip-text text-transparent flex items-center gap-2">
+            <UsersIcon size={32} className="text-primary-500 dark:text-primary-400" />
+            Users Management
+          </h1>
+          <p className="text-primary-600/70 dark:text-primary-400/70 mt-1">Manage users, roles, and account status</p>
+        </div>
+        {canCreate && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 text-white rounded-xl font-medium hover:from-primary-600 hover:to-primary-500 dark:hover:from-primary-500 dark:hover:to-primary-600 transition-all flex items-center gap-2 shadow-lg shadow-primary-400/30 dark:shadow-primary-900/30 hover:scale-105"
+          >
+            <PlusIcon size={20} />
+            Add User
+          </button>
+        )}
+      </div>
+
+      <div className="relative">
+        <SearchIcon size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400 dark:text-primary-500" />
+        <input
+          type="text"
+          placeholder="Search users by name, email, role, or company..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-white dark:bg-dark-900/50 text-primary-800 dark:text-primary-100 placeholder-primary-400/60 dark:placeholder-primary-600/60 focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500 focus:border-primary-400 dark:focus:border-primary-500 transition-all"
+        />
+      </div>
+
+      <div className="bg-white/80 dark:bg-dark-900/80 rounded-2xl border border-cream-200/60 dark:border-dark-800/60 shadow-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-cream-100 dark:bg-dark-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">User</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Role</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Company</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">2FA</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Created</th>
+                {canManage && <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-cream-200 dark:divide-dark-800">
+              {filteredUsers.map((u) => (
+                <tr key={u.id} className="hover:bg-cream-50 dark:hover:bg-dark-800/40 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-primary-800 dark:text-primary-100">{u.full_name}</p>
+                    <p className="text-xs text-primary-500 dark:text-primary-400">{u.email}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-1 rounded-lg text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                      {roleLabels[u.role] || u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-primary-700 dark:text-primary-300">
+                    {u.companies?.display_name || '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        'px-2 py-1 rounded-lg text-xs',
+                        u.totp_enabled
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                      )}
+                    >
+                      {u.totp_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        'px-2 py-1 rounded-lg text-xs',
+                        u.is_active
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                      )}
+                    >
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-primary-600 dark:text-primary-400">{formatDateTime(u.created_at)}</td>
+                  {canManage && (
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(u)}
+                          className="px-3 py-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform"
+                        >
+                          <EditIcon size={14} />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => toggleActive(u)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg text-xs',
+                            u.is_active
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                              : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          )}
+                        >
+                          {u.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {filteredUsers.length === 0 && (
+        <div className="text-center py-10">
+          <UserRoundPlusIcon size={52} className="mx-auto text-primary-400 dark:text-primary-500 mb-2" />
+          <p className="text-primary-600 dark:text-primary-400">No users found</p>
+        </div>
+      )}
+
+      {showModal && canCreate && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-900 rounded-2xl w-full max-w-xl border border-cream-200 dark:border-dark-800 shadow-2xl">
+            <div className="p-5 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 rounded-t-2xl flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">{editingUser ? 'Edit User' : 'Create User'}</h2>
+              <button onClick={resetForm} className="p-2 rounded-lg hover:bg-white/20">
+                <XIcon size={18} className="text-white" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Full Name</label>
+                <input
+                  required
+                  value={formData.full_name}
+                  onChange={(e) => setFormData((v) => ({ ...v, full_name: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+                  placeholder="John Doe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData((v) => ({ ...v, email: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+                  placeholder="user@company.com"
+                />
+              </div>
+
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={formData.password}
+                    onChange={(e) => setFormData((v) => ({ ...v, password: e.target.value }))}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+                    placeholder="Minimum 8 characters"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData((v) => ({ ...v, role: e.target.value }))}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+                    disabled={!isSuperAdmin}
+                  >
+                    {availableRoles.map((role) => (
+                      <option key={role} value={role}>
+                        {roleLabels[role] || role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Company</label>
+                  <select
+                    value={formData.company_id || ''}
+                    onChange={(e) => setFormData((v) => ({ ...v, company_id: e.target.value }))}
+                    disabled={!requiresCompany || currentUser?.role === 'company_admin'}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100 disabled:opacity-60"
+                  >
+                    <option value="">Select company</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {editingUser && (
+                <label className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData((v) => ({ ...v, is_active: e.target.checked }))}
+                  />
+                  Active user
+                </label>
+              )}
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-cream-200 dark:bg-dark-700 text-primary-700 dark:text-primary-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 text-white flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                >
+                  <CheckIcon size={16} />
+                  {editingUser ? 'Update User' : 'Create User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
