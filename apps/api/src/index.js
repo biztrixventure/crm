@@ -6,6 +6,29 @@ import { createServer } from 'http';
 import { initSocket } from './services/socket.js';
 import { initRedis } from './services/redis.js';
 
+// Validate required environment variables at startup
+function validateEnvironment() {
+  const required = [
+    'JWT_SECRET',
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_KEY',
+    'SUPABASE_ANON_KEY'
+  ];
+  
+  const missing = required.filter(v => !process.env[v]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:');
+    missing.forEach(v => console.error(`   - ${v}`));
+    console.error('\nPlease set these variables in your .env file or Coolify environment.');
+    process.exit(1);
+  }
+  
+  console.log('✅ Environment variables validated');
+}
+
+validateEnvironment();
+
 // Import routes
 import authRoutes from './routes/auth.js';
 import companyRoutes from './routes/companies.js';

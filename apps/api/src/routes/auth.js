@@ -68,7 +68,16 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
       .eq('id', authUserId)
       .single();
 
-    if (userError || !user) {
+    if (userError) {
+      console.error('Database error fetching user profile:', userError);
+      // Check if it's a "not found" error vs other database errors
+      if (userError.code === 'PGRST116') {
+        return res.status(401).json({ error: 'User profile not found. Please contact admin.' });
+      }
+      return res.status(500).json({ error: 'Database error while fetching user profile' });
+    }
+
+    if (!user) {
       return res.status(401).json({ error: 'User profile not found' });
     }
 
