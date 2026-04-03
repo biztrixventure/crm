@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
+  unreadCount: 0,
 
   addNotification: (notification) => {
     const id = Date.now();
@@ -10,6 +11,7 @@ export const useNotificationStore = create((set, get) => ({
         ...state.notifications,
         { id, ...notification, createdAt: new Date() },
       ],
+      unreadCount: state.unreadCount + 1,
     }));
 
     // Auto-remove after 10 seconds
@@ -26,5 +28,6 @@ export const useNotificationStore = create((set, get) => ({
     }));
   },
 
-  clearAll: () => set({ notifications: [] }),
+  markAllRead: () => set({ unreadCount: 0 }),
+  clearAll: () => set({ notifications: [], unreadCount: 0 }),
 }));

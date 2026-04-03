@@ -16,7 +16,12 @@ export function useSocket() {
 
     const socket = connectSocket();
 
-    // Event handlers
+    // Event handlers (ensure no duplicate listeners on re-renders)
+    socket.off('transfer:new');
+    socket.off('sale:made');
+    socket.off('callback:due');
+    socket.off('admin:new_entity');
+
     socket.on('transfer:new', (data) => {
       toast.success(data.message, { duration: 5000 });
       addNotification({

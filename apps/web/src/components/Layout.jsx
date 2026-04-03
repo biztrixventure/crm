@@ -57,8 +57,11 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
   const notifications = useNotificationStore((state) => state.notifications);
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const markAllRead = useNotificationStore((state) => state.markAllRead);
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const navItems = navigation[user?.role] || [];
 
@@ -161,14 +164,37 @@ export default function Layout() {
               </button>
 
               {/* Notifications */}
-              <button className="relative p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105">
+              <button
+                onClick={() => {
+                  setNotificationsOpen((v) => !v);
+                  markAllRead();
+                }}
+                className="relative p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105"
+              >
                 <BellIcon size={20} />
-                {notifications.length > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full text-xs text-white flex items-center justify-center font-bold shadow-lg animate-pulse">
-                    {notifications.length}
+                    {unreadCount}
                   </span>
                 )}
               </button>
+              {notificationsOpen && (
+                <div className="absolute right-20 top-14 w-80 max-h-96 overflow-auto bg-white dark:bg-dark-900 rounded-xl shadow-xl border border-cream-200 dark:border-dark-800 z-50">
+                  <div className="p-3 border-b border-cream-200 dark:border-dark-800">
+                    <h3 className="font-semibold text-primary-800 dark:text-primary-200">Notifications</h3>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p className="p-4 text-sm text-primary-500 dark:text-primary-400">No notifications yet.</p>
+                  ) : (
+                    notifications.slice().reverse().map((n) => (
+                      <div key={n.id} className="p-3 border-b border-cream-100 dark:border-dark-800/70">
+                        <p className="text-sm font-semibold text-primary-800 dark:text-primary-200">{n.title}</p>
+                        <p className="text-xs text-primary-600 dark:text-primary-400 mt-0.5">{n.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               {/* Profile dropdown */}
               <div className="relative">

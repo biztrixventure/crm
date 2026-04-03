@@ -19,7 +19,7 @@ export function initSocket(httpServer) {
     console.log(`Socket connected: ${socket.id}`);
 
     // Join user-specific room
-    socket.on('join', ({ userId, companyId }) => {
+    socket.on('join', ({ userId, companyId, role }) => {
       if (userId) {
         socket.join(`user:${userId}`);
         console.log(`Socket ${socket.id} joined user:${userId}`);
@@ -27,6 +27,10 @@ export function initSocket(httpServer) {
       if (companyId) {
         socket.join(`company:${companyId}`);
         console.log(`Socket ${socket.id} joined company:${companyId}`);
+      }
+      if (role) {
+        socket.join(`role:${role}`);
+        console.log(`Socket ${socket.id} joined role:${role}`);
       }
     });
 
@@ -54,6 +58,11 @@ export function notifyUser(userId, event, data) {
 export function notifyCompany(companyId, event, data) {
   if (!io) return;
   io.to(`company:${companyId}`).emit(event, data);
+}
+
+export function notifyRole(role, event, data) {
+  if (!io) return;
+  io.to(`role:${role}`).emit(event, data);
 }
 
 export function notifyTransferToCloser(closerId, transfer) {

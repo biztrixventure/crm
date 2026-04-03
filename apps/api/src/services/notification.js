@@ -1,4 +1,4 @@
-import { getIO } from './socket.js';
+import { getIO, notifyRole } from './socket.js';
 
 export function emitToUser(userId, event, data) {
   const io = getIO();
@@ -39,14 +39,16 @@ export function notifyCallbackDue(userId, callback) {
 
 // New company/user created - notify super admin
 export function notifyAdminNewEntity(entityType, entity) {
-  const io = getIO();
-  // Broadcast to all connected super admins
-  io.emit('admin:new_entity', {
+  // Notify only admin roles
+  const payload = {
     message: `New ${entityType} created: ${entity.name || entity.full_name}`,
     entityType,
     entity,
     timestamp: new Date().toISOString(),
-  });
+  };
+
+  notifyRole('super_admin', 'admin:new_entity', payload);
+  notifyRole('readonly_admin', 'admin:new_entity', payload);
 }
 
 export default {

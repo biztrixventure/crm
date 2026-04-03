@@ -23,16 +23,18 @@ export function connectSocket() {
   
   if (!socket.connected && user) {
     socket.connect();
-    
-    socket.on('connect', () => {
-      console.log('Socket connected');
-      // Join user room
-      socket.emit('join', {
-        userId: user.id,
-        companyId: user.companyId,
-      });
-    });
   }
+
+  // Ensure a single connect listener
+  socket.off('connect');
+  socket.on('connect', () => {
+    console.log('Socket connected');
+    socket.emit('join', {
+      userId: user.id,
+      companyId: user.companyId,
+      role: user.role,
+    });
+  });
 
   return socket;
 }
