@@ -11,6 +11,7 @@ import {
 import api from '../../lib/axios';
 import { cn, formatDateTime, roleLabels } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth';
+import toast from 'react-hot-toast';
 
 const roleOptions = [
   'super_admin',
@@ -50,21 +51,29 @@ export default function UsersPage() {
   const requiresCompany = ['company_admin', 'fronter'].includes(formData.role);
 
   useEffect(() => {
-    fetchData();
+    fetchUsers();
   }, []);
 
-  async function fetchData() {
+  async function fetchUsers() {
     try {
-      const usersPromise = api.get('/users');
-      const companiesPromise = isSuperAdmin ? api.get('/companies') : Promise.resolve({ data: { companies: [] } });
-      const [usersRes, companiesRes] = await Promise.all([usersPromise, companiesPromise]);
+      const usersRes = await api.get('/users', { timeout: 15000 });
       setUsers(usersRes.data.users || []);
-      setCompanies(companiesRes.data.companies || []);
     } catch (error) {
       console.error('Failed to fetch users data:', error);
-      alert(error.response?.data?.error || 'Failed to fetch users');
+      toast.error(error.response?.data?.error || 'Failed to fetch users');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchCompaniesIfNeeded() {
+    if (!isSuperAdmin || companies.length > 0) return;
+    try {
+      const companiesRes = await api.get('/companies', { timeout: 15000 });
+      setCompanies(companiesRes.data.companies || []);
+    } catch (error) {
+      console.error('Failed to fetch companies data:', error);
+      toast.error(error.response?.data?.error || 'Failed to fetch companies');
     }
   }
 
@@ -82,6 +91,7 @@ export default function UsersPage() {
   }
 
   function handleEdit(user) {
+    fetchCompaniesIfNeeded();
     setEditingUser(user);
     setFormData({
       email: user.email || '',
@@ -114,21 +124,21 @@ export default function UsersPage() {
           password: formData.password,
         });
       }
-      await fetchData();
+      await fetchUsers();
       resetForm();
     } catch (error) {
       console.error('Failed to save user:', error);
-      alert(error.response?.data?.error || 'Failed to save user');
+      toast.error(error.response?.data?.error || 'Failed to save user');
     }
   }
 
   async function toggleActive(user) {
     try {
       await api.patch(`/users/${user.id}`, { is_active: !user.is_active });
-      await fetchData();
+      await fetchUsers();
     } catch (error) {
       console.error('Failed to update user status:', error);
-      alert(error.response?.data?.error || 'Failed to update user status');
+      toast.error(error.response?.data?.error || 'Failed to update user status');
     }
   }
 
@@ -164,7 +174,10 @@ export default function UsersPage() {
         </div>
         {canCreate && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              fetchCompaniesIfNeeded();
+              setShowModal(true);
+            }}
             className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 text-white rounded-xl font-medium hover:from-primary-600 hover:to-primary-500 dark:hover:from-primary-500 dark:hover:to-primary-600 transition-all flex items-center gap-2 shadow-lg shadow-primary-400/30 dark:shadow-primary-900/30 hover:scale-105"
           >
             <PlusIcon size={20} />
