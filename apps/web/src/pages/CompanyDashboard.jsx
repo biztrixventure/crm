@@ -325,10 +325,17 @@ function Outcomes() {
 }
 
 function Fronters() {
+  const { user } = useAuthStore();
   const [fronters, setFronters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+  });
 
   async function fetchFronters() {
     try {
@@ -346,6 +353,27 @@ function Fronters() {
   useEffect(() => {
     fetchFronters();
   }, []);
+
+  async function handleCreateFronter(e) {
+    e.preventDefault();
+    try {
+      setCreating(true);
+      await api.post('/users', {
+        full_name: form.full_name,
+        email: form.email,
+        password: form.password,
+        role: 'fronter',
+        company_id: user.companyId,
+      }, { timeout: 12000 });
+      toast.success('Fronter created successfully');
+      setForm({ full_name: '', email: '', password: '' });
+      await fetchFronters();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to create fronter');
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function toggleActive(user) {
     try {
@@ -373,6 +401,45 @@ function Fronters() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Company Fronters</h1>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Create New Fronter</h3>
+        <form onSubmit={handleCreateFronter} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            required
+            value={form.full_name}
+            onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
+            placeholder="Full name"
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <input
+            required
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+            placeholder="Email"
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <input
+            required
+            minLength={8}
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+            placeholder="Password (min 8 chars)"
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <button
+            type="submit"
+            disabled={creating}
+            className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+            Create Fronter
+          </button>
+        </form>
+      </div>
+
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <input
