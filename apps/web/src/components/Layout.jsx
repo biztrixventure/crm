@@ -3,52 +3,50 @@ import { useAuthStore } from '../store/auth';
 import { useUIStore } from '../store/ui';
 import { useNotificationStore } from '../store/notifications';
 import {
-  Home,
-  Users,
-  Building2,
-  Phone,
-  FileText,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Sun,
-  Moon,
-  Bell,
-  ChevronDown,
-  Sparkles,
-} from 'lucide-react';
+  HomeIcon,
+  UsersIcon,
+  SettingsIcon,
+  LogoutIcon,
+  MenuIcon,
+  XIcon,
+  SunIcon,
+  MoonIcon,
+  BellIcon,
+  ChevronDownIcon,
+  SparklesIcon,
+} from 'lucide-animated';
+import { Building2, Phone, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { cn, roleLabels, getInitials } from '../lib/utils';
 
 const navigation = {
   super_admin: [
-    { name: 'Dashboard', href: '/admin', icon: Home },
+    { name: 'Dashboard', href: '/admin', icon: HomeIcon },
     { name: 'Companies', href: '/admin/companies', icon: Building2 },
-    { name: 'Users', href: '/admin/users', icon: Users },
-    { name: 'Dispositions', href: '/admin/dispositions', icon: Settings },
+    { name: 'Users', href: '/admin/users', icon: UsersIcon },
+    { name: 'Dispositions', href: '/admin/dispositions', icon: SettingsIcon },
     { name: 'Audit Log', href: '/admin/audit', icon: FileText },
   ],
   readonly_admin: [
-    { name: 'Dashboard', href: '/admin', icon: Home },
+    { name: 'Dashboard', href: '/admin', icon: HomeIcon },
     { name: 'Companies', href: '/admin/companies', icon: Building2 },
-    { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Users', href: '/admin/users', icon: UsersIcon },
     { name: 'Audit Log', href: '/admin/audit', icon: FileText },
   ],
   company_admin: [
-    { name: 'Dashboard', href: '/company', icon: Home },
+    { name: 'Dashboard', href: '/company', icon: HomeIcon },
     { name: 'Transfers', href: '/company/transfers', icon: Phone },
     { name: 'Outcomes', href: '/company/outcomes', icon: FileText },
-    { name: 'Fronters', href: '/company/fronters', icon: Users },
+    { name: 'Fronters', href: '/company/fronters', icon: UsersIcon },
     { name: 'Number Lists', href: '/company/numbers', icon: FileText },
   ],
   closer: [
-    { name: 'Dashboard', href: '/closer', icon: Home },
+    { name: 'Dashboard', href: '/closer', icon: HomeIcon },
     { name: 'My Outcomes', href: '/closer/outcomes', icon: FileText },
     { name: 'Callbacks', href: '/closer/callbacks', icon: Phone },
   ],
   fronter: [
-    { name: 'Dashboard', href: '/fronter', icon: Home },
+    { name: 'Dashboard', href: '/fronter', icon: HomeIcon },
     { name: 'My Transfers', href: '/fronter/transfers', icon: Phone },
     { name: 'My Numbers', href: '/fronter/numbers', icon: FileText },
     { name: 'Callbacks', href: '/fronter/callbacks', icon: Phone },
@@ -98,7 +96,7 @@ export default function Layout() {
             onClick={toggleSidebar}
             className="lg:hidden p-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-white transition-colors"
           >
-            <X className="w-5 h-5" />
+            <XIcon size={20} />
           </button>
         </div>
 
@@ -106,6 +104,7 @@ export default function Layout() {
         <nav className="p-4 space-y-1.5">
           {navItems.map((item) => {
             const isActive = location.pathname === item.href;
+            
             return (
               <Link
                 key={item.name}
@@ -117,9 +116,12 @@ export default function Layout() {
                     : 'text-white/90 dark:text-white/80 hover:bg-white/15 dark:hover:bg-white/10 hover:text-white'
                 )}
               >
-                <item.icon className={cn('w-5 h-5', isActive && 'text-primary-500 dark:text-primary-400')} />
+                <item.icon 
+                  size={20}
+                  className={cn('w-5 h-5', isActive && 'text-primary-500 dark:text-primary-400')} 
+                />
                 <span className="font-medium">{item.name}</span>
-                {isActive && <Sparkles className="w-4 h-4 ml-auto text-accent-400 dark:text-accent-300" />}
+                {isActive && <SparklesIcon size={16} className="ml-auto text-accent-400 dark:text-accent-300" />}
               </Link>
             );
           })}
@@ -142,7 +144,7 @@ export default function Layout() {
               onClick={toggleSidebar}
               className="lg:hidden p-2 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-600 dark:text-primary-300 transition-colors"
             >
-              <Menu className="w-5 h-5" />
+              <MenuIcon size={20} />
             </button>
 
             <div className="flex items-center space-x-3 ml-auto">
@@ -152,15 +154,15 @@ export default function Layout() {
                 className="p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105"
               >
                 {theme === 'dark' ? (
-                  <Sun className="w-5 h-5 animate-spin-slow" />
+                  <SunIcon size={20} />
                 ) : (
-                  <Moon className="w-5 h-5" />
+                  <MoonIcon size={20} />
                 )}
               </button>
 
               {/* Notifications */}
               <button className="relative p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105">
-                <Bell className="w-5 h-5" />
+                <BellIcon size={20} />
                 {notifications.length > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full text-xs text-white flex items-center justify-center font-bold shadow-lg animate-pulse">
                     {notifications.length}
@@ -187,7 +189,7 @@ export default function Layout() {
                       {roleLabels[user?.role]}
                     </p>
                   </div>
-                  <ChevronDown className={cn("w-4 h-4 text-primary-400 dark:text-primary-300 transition-transform", profileOpen && "rotate-180")} />
+                  <ChevronDownIcon size={16} className={cn("text-primary-400 dark:text-primary-300 transition-transform", profileOpen && "rotate-180")} />
                 </button>
 
                 {profileOpen && (
@@ -199,7 +201,7 @@ export default function Layout() {
                       }}
                       className="w-full flex items-center space-x-2 px-4 py-3 text-sm text-primary-700 dark:text-primary-200 hover:bg-cream-50 dark:hover:bg-dark-800 transition-colors"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogoutIcon size={16} />
                       <span>Logout</span>
                     </button>
                   </div>

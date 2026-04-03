@@ -2,17 +2,11 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import api from '../lib/axios';
 import {
-  Building2,
-  Users,
-  Phone,
-  TrendingUp,
-  DollarSign,
-  Clock,
-  Plus,
-  Search,
-  Sparkles,
-  Star,
-} from 'lucide-react';
+  UsersIcon,
+  TrendingUpIcon,
+  SparklesIcon,
+} from 'lucide-animated';
+import { Building2, DollarSign, Clock, Plus, Search, Star, Phone } from 'lucide-react';
 import { formatDateTime, cn } from '../lib/utils';
 import { useAuthStore } from '../store/auth';
 import { Companies } from './admin';
@@ -49,7 +43,7 @@ function KPICard({ title, value, icon: Icon, trend, color = 'primary' }) {
           )}
         </div>
         <div className={cn('p-4 rounded-2xl shadow-lg', colors[color])}>
-          <Icon className={cn('w-7 h-7', iconColors[color])} />
+          <Icon className={iconColors[color]} />
         </div>
       </div>
     </div>
@@ -128,25 +122,25 @@ function Overview() {
         <KPICard
           title="Total Transfers"
           value={stats?.totalTransfers || 0}
-          icon={Phone}
+          icon={(props) => <Phone {...props} className="w-7 h-7" />}
           color="primary"
         />
         <KPICard
           title="Total Sales"
           value={stats?.totalSales || 0}
-          icon={DollarSign}
+          icon={(props) => <DollarSign {...props} className="w-7 h-7" />}
           color="green"
         />
         <KPICard
           title="Active Companies"
           value={stats?.activeCompanies || 0}
-          icon={Building2}
+          icon={(props) => <Building2 {...props} className="w-7 h-7" />}
           color="blue"
         />
         <KPICard
           title="Total Users"
           value={stats?.totalUsers || 0}
-          icon={Users}
+          icon={(props) => <UsersIcon {...props} size={28} />}
           color="yellow"
         />
       </div>

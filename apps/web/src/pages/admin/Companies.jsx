@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { 
-  Building2, 
-  Plus, 
-  Search, 
-  Edit2, 
-  Trash2, 
-  X,
-  Save,
-  Settings,
-} from 'lucide-react';
+  PlusIcon, 
+  SearchIcon, 
+  SquarePenIcon as EditIcon, 
+  DeleteIcon as TrashIcon, 
+  XIcon,
+  CheckIcon,
+  SettingsIcon,
+} from 'lucide-animated';
+import { Building2 } from 'lucide-react';
 import api from '../../lib/axios';
 import { cn } from '../../lib/utils';
 
@@ -131,14 +131,14 @@ export default function Companies() {
           onClick={() => setShowModal(true)}
           className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 text-white rounded-xl font-medium hover:from-primary-600 hover:to-primary-500 dark:hover:from-primary-500 dark:hover:to-primary-600 transition-all flex items-center gap-2 shadow-lg shadow-primary-400/30 dark:shadow-primary-900/30 hover:scale-105"
         >
-          <Plus className="w-5 h-5" />
+          <PlusIcon size={20} />
           Add Company
         </button>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 dark:text-primary-500" />
+        <SearchIcon size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400 dark:text-primary-500" />
         <input
           type="text"
           placeholder="Search companies..."
@@ -198,14 +198,14 @@ export default function Companies() {
                 onClick={() => handleEdit(company)}
                 className="flex-1 px-3 py-2 bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
               >
-                <Edit2 className="w-4 h-4" />
+                <EditIcon size={16} />
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(company.id)}
                 className="flex-1 px-3 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
               >
-                <Trash2 className="w-4 h-4" />
+                <TrashIcon size={16} />
                 Delete
               </button>
             </div>
@@ -223,23 +223,23 @@ export default function Companies() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-primary-500 to-primary-400 p-6 flex items-center justify-between">
+          <div className="bg-white dark:bg-dark-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 p-6 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">
                 {editingCompany ? 'Edit Company' : 'Add New Company'}
               </h2>
               <button
                 onClick={handleCloseModal}
-                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                className="p-2 hover:bg-white/20 dark:hover:bg-white/10 rounded-xl transition-colors"
               >
-                <X className="w-5 h-5 text-white" />
+                <XIcon size={20} className="text-white" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-primary-700 mb-2">
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-2">
                     Company Name
                   </label>
                   <input
@@ -247,13 +247,13 @@ export default function Companies() {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 bg-cream-50/50 text-primary-800 focus:ring-2 focus:ring-primary-400 focus:border-primary-400 transition-all"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100 focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500 focus:border-primary-400 dark:focus:border-primary-500 transition-all"
                     placeholder="Acme Corporation"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-primary-700 mb-2">
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-2">
                     Display Name
                   </label>
                   <input
@@ -261,13 +261,13 @@ export default function Companies() {
                     required
                     value={formData.display_name}
                     onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 bg-cream-50/50 text-primary-800 focus:ring-2 focus:ring-primary-400 focus:border-primary-400 transition-all"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100 focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500 focus:border-primary-400 dark:focus:border-primary-500 transition-all"
                     placeholder="Acme Corp"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-primary-700 mb-2">
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-2">
                     Slug
                   </label>
                   <input
@@ -342,15 +342,15 @@ export default function Companies() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="flex-1 px-4 py-3 bg-cream-200 hover:bg-cream-300 text-primary-700 rounded-xl font-medium transition-colors"
+                  className="flex-1 px-4 py-3 bg-cream-200 dark:bg-dark-700 hover:bg-cream-300 dark:hover:bg-dark-600 text-primary-700 dark:text-primary-300 rounded-xl font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-400 hover:from-primary-600 hover:to-primary-500 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 hover:from-primary-600 hover:to-primary-500 dark:hover:from-primary-500 dark:hover:to-primary-600 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-105"
                 >
-                  <Save className="w-5 h-5" />
+                  <CheckIcon size={20} />
                   {editingCompany ? 'Update' : 'Create'}
                 </button>
               </div>

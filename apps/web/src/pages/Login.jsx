@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { Eye, EyeOff, Loader2, Building2, Sparkles } from 'lucide-react';
+import { EyeIcon, EyeOffIcon, SparklesIcon } from 'lucide-animated';
+import { Building2, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,9 +42,9 @@ export default function Login() {
             BizTrixVenture
           </h1>
           <p className="text-primary-600/80 dark:text-primary-400/80 mt-2 flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4" />
+            <SparklesIcon size={16} />
             Customer Relationship Management
-            <Sparkles className="w-4 h-4" />
+            <SparklesIcon size={16} />
           </p>
         </div>
 
@@ -98,9 +99,9 @@ export default function Login() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 dark:text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
+                    <EyeOffIcon size={20} />
                   ) : (
-                    <Eye className="w-5 h-5" />
+                    <EyeIcon size={20} />
                   )}
                 </button>
               </div>
