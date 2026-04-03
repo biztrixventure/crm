@@ -36,9 +36,12 @@ import userRoutes from './routes/users.js';
 import transferRoutes from './routes/transfers.js';
 import outcomeRoutes from './routes/outcomes.js';
 import dispositionRoutes from './routes/dispositions.js';
+import planRoutes from './routes/plans.js';
+import clientRoutes from './routes/clients.js';
 import callbackRoutes from './routes/callbacks.js';
 import numberRoutes from './routes/numbers.js';
 import searchRoutes from './routes/search.js';
+import searchConfigRoutes from './routes/search-config.js';
 import auditRoutes from './routes/audit.js';
 
 const app = express();
@@ -87,9 +90,12 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/transfers', transferRoutes);
 app.use('/api/v1/outcomes', outcomeRoutes);
 app.use('/api/v1/dispositions', dispositionRoutes);
+app.use('/api/v1/plans', planRoutes);
+app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/callbacks', callbackRoutes);
 app.use('/api/v1/numbers', numberRoutes);
 app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/search-config', searchConfigRoutes);
 app.use('/api/v1/audit', auditRoutes);
 
 // 404 handler

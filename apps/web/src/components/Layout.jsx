@@ -26,6 +26,9 @@ const navigation = {
     { name: 'Companies', href: '/admin/companies', icon: Building2 },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
     { name: 'Dispositions', href: '/admin/dispositions', icon: SettingsIcon },
+    { name: 'Plans', href: '/admin/plans', icon: FileText },
+    { name: 'Clients', href: '/admin/clients', icon: FileText },
+    { name: 'Search Config', href: '/admin/search-config', icon: SettingsIcon },
     { name: 'Audit Log', href: '/admin/audit', icon: FileText },
   ],
   readonly_admin: [
