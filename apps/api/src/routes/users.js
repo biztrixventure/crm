@@ -152,6 +152,122 @@ router.post('/', validate(createUserSchema), async (req, res) => {
   }
 });
 
+// GET /users/me/profile - Get current user's profile (MUST be before /:id route)
+router.get('/me/profile', async (req, res) => {
+  const { id } = req.user;
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        totp_enabled,
+        created_at,
+        last_login,
+        companies!users_company_id_fkey (
+          id,
+          name,
+          display_name,
+          logo_url
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get user stats
+    const stats = {};
+    
+    if (user.role === 'fronter') {
+      const { count: transferCount } = await supabase
+        .from('transfers')
+        .select('id', { count: 'exact', head: true })
+        .eq('fronter_id', id);
+      stats.totalTransfers = transferCount || 0;
+    } else if (user.role === 'closer') {
+      const [{ count: outcomeCount }, { count: saleCount }] = await Promise.all([
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id),
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id).not('revenue', 'is', null),
+      ]);
+      stats.totalOutcomes = outcomeCount || 0;
+      stats.totalSales = saleCount || 0;
+    }
+
+    res.json({ user, stats });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// PATCH /users/me/profile - Update current user's profile (MUST be before /:id route)
+router.patch('/me/profile', async (req, res) => {
+  const { id } = req.user;
+  const { full_name } = req.body;
+
+  // Users can only update their own name (not email, role, etc.)
+  if (!full_name || full_name.trim().length < 2) {
+    return res.status(422).json({ error: 'Full name must be at least 2 characters' });
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({ full_name: full_name.trim() })
+      .eq('id', id)
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        totp_enabled,
+        created_at,
+        companies!users_company_id_fkey (
+          id,
+          name,
+          display_name
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    res.json({ user });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// GET /users/closers/list - List active closers (for transfer form dropdown)
+router.get('/closers/list', async (req, res) => {
+  try {
+    const { data: closers, error } = await supabase
+      .from('users')
+      .select('id, full_name, email')
+      .eq('role', 'closer')
+      .eq('is_active', true)
+      .order('full_name');
+
+    if (error) throw error;
+
+    res.json({ closers });
+  } catch (err) {
+    console.error('Get closers error:', err);
+    res.status(500).json({ error: 'Failed to fetch closers' });
+  }
+});
+
 // GET /users/:id - Get single user
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
@@ -288,103 +404,6 @@ router.get('/closers/list', async (req, res) => {
   } catch (err) {
     console.error('Get closers error:', err);
     res.status(500).json({ error: 'Failed to fetch closers' });
-  }
-});
-
-// GET /users/me/profile - Get current user's profile
-router.get('/me/profile', async (req, res) => {
-  const { id } = req.user;
-
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select(`
-        id,
-        email,
-        full_name,
-        role,
-        company_id,
-        is_active,
-        totp_enabled,
-        created_at,
-        last_login,
-        companies!users_company_id_fkey (
-          id,
-          name,
-          display_name,
-          logo_url
-        )
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error || !user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Get user stats
-    const stats = {};
-    
-    if (user.role === 'fronter') {
-      const { count: transferCount } = await supabase
-        .from('transfers')
-        .select('id', { count: 'exact', head: true })
-        .eq('fronter_id', id);
-      stats.totalTransfers = transferCount || 0;
-    } else if (user.role === 'closer') {
-      const [{ count: outcomeCount }, { count: saleCount }] = await Promise.all([
-        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id),
-        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id).not('revenue', 'is', null),
-      ]);
-      stats.totalOutcomes = outcomeCount || 0;
-      stats.totalSales = saleCount || 0;
-    }
-
-    res.json({ user, stats });
-  } catch (err) {
-    console.error('Get profile error:', err);
-    res.status(500).json({ error: 'Failed to fetch profile' });
-  }
-});
-
-// PATCH /users/me/profile - Update current user's profile
-router.patch('/me/profile', async (req, res) => {
-  const { id } = req.user;
-  const { full_name } = req.body;
-
-  // Users can only update their own name (not email, role, etc.)
-  if (!full_name || full_name.trim().length < 2) {
-    return res.status(422).json({ error: 'Full name must be at least 2 characters' });
-  }
-
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .update({ full_name: full_name.trim() })
-      .eq('id', id)
-      .select(`
-        id,
-        email,
-        full_name,
-        role,
-        company_id,
-        is_active,
-        totp_enabled,
-        created_at,
-        companies!users_company_id_fkey (
-          id,
-          name,
-          display_name
-        )
-      `)
-      .single();
-
-    if (error) throw error;
-
-    res.json({ user });
-  } catch (err) {
-    console.error('Update profile error:', err);
-    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 
