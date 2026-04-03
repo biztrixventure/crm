@@ -477,14 +477,18 @@ router.get('/:id/detailed', roleGuard('super_admin', 'readonly_admin'), async (r
 
     // Get stats in parallel
     const [
-      userStats,
+      usersByRole,
       transferStats,
       outcomeStats,
       recentTransfers,
       topPerformers
     ] = await Promise.all([
-      // User stats by role
-      supabase.rpc('count_users_by_role', { target_company_id: id }).catch(() => ({ data: [] })),
+      // User stats by role - simple query instead of RPC
+      supabase
+        .from('users')
+        .select('role')
+        .eq('company_id', id)
+        .eq('is_active', true),
       
       // Transfer stats
       Promise.all([
@@ -520,6 +524,13 @@ router.get('/:id/detailed', roleGuard('super_admin', 'readonly_admin'), async (r
         .gte('created_at', thirtyDaysAgo.toISOString())
     ]);
 
+    // Count users by role
+    const roleCounts = {};
+    (usersByRole.data || []).forEach(u => {
+      roleCounts[u.role] = (roleCounts[u.role] || 0) + 1;
+    });
+    const userStats = Object.entries(roleCounts).map(([role, count]) => ({ role, count }));
+
     // Calculate top performers
     const closerCounts = {};
     (topPerformers.data || []).forEach(o => {
@@ -535,8 +546,8 @@ router.get('/:id/detailed', roleGuard('super_admin', 'readonly_admin'), async (r
       company,
       stats: {
         users: {
-          total: (userStats.data || []).reduce((sum, r) => sum + (r.count || 0), 0),
-          byRole: userStats.data || []
+          total: userStats.reduce((sum, r) => sum + (r.count || 0), 0),
+          byRole: userStats
         },
         transfers: {
           total: transferStats[0].count || 0,
