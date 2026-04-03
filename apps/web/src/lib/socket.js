@@ -6,9 +6,20 @@ let socket = null;
 export function initSocket() {
   if (socket?.connected) return socket;
 
+  const isHttps = window.location.protocol === 'https:';
+  const isProdHost = !['localhost', '127.0.0.1'].includes(window.location.hostname);
+
   socket = io(window.location.origin, {
-    transports: ['websocket', 'polling'],
+    // Behind reverse proxies, polling-first is more reliable than websocket-first.
+    transports: isProdHost ? ['polling'] : ['websocket', 'polling'],
+    upgrade: !isProdHost,
     autoConnect: false,
+    withCredentials: true,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    timeout: 10000,
+    secure: isHttps,
   });
 
   return socket;

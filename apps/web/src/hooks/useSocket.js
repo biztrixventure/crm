@@ -73,11 +73,17 @@ export function useSocket() {
       });
     });
 
+    socket.off('connect_error');
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connect error:', err?.message || 'connection failed');
+    });
+
     return () => {
       socket.off('transfer:new');
       socket.off('sale:made');
       socket.off('callback:due');
       socket.off('admin:new_entity');
+      socket.off('connect_error');
     };
   }, [user, token, addNotification]);
 
