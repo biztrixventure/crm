@@ -281,9 +281,9 @@ export default function Companies() {
                 </div>
               </div>
 
-              <div className="bg-cream-100 rounded-xl p-4">
-                <h3 className="font-semibold text-primary-800 mb-3 flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
+              <div className="bg-cream-100 dark:bg-dark-800 rounded-xl p-4">
+                <h3 className="font-semibold text-primary-800 dark:text-primary-200 mb-3 flex items-center gap-2">
+                  <SettingsIcon size={20} />
                   Feature Flags
                 </h3>
                 <div className="space-y-3">
