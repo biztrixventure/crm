@@ -191,4 +191,91 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// POST /outcomes/:id/new-policy - Create new policy linked to existing outcome
+router.post('/:id/new-policy', roleGuard('closer'), validate(createOutcomeSchema), async (req, res) => {
+  const { id: existingOutcomeId } = req.params;
+  const { id: closerId } = req.user;
+  const { transfer_id, company_id, customer_phone, customer_name, disposition_id, remarks } = req.body;
+
+  try {
+    // Verify existing outcome exists
+    const { data: existing, error: existingError } = await supabase
+      .from('outcomes')
+      .select('id, customer_phone, customer_name')
+      .eq('id', existingOutcomeId)
+      .single();
+
+    if (existingError || !existing) {
+      return res.status(404).json({ error: 'Existing outcome not found' });
+    }
+
+    // Verify company exists
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('id, display_name')
+      .eq('id', company_id)
+      .single();
+
+    if (companyError || !company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    // Verify disposition exists
+    const { data: disposition, error: dispError } = await supabase
+      .from('dispositions')
+      .select('id, label')
+      .eq('id', disposition_id)
+      .eq('is_active', true)
+      .single();
+
+    if (dispError || !disposition) {
+      return res.status(404).json({ error: 'Disposition not found' });
+    }
+
+    // Normalize phone
+    const normalizedPhone = normalizePhone(customer_phone);
+
+    // Create new outcome linked to existing
+    const { data: newOutcome, error } = await supabase
+      .from('outcomes')
+      .insert({
+        transfer_id,
+        company_id,
+        closer_id: closerId,
+        customer_phone: normalizedPhone,
+        customer_name,
+        disposition_id,
+        remarks,
+        linked_outcome_id: existingOutcomeId,
+      })
+      .select(`
+        *,
+        closer:users!outcomes_closer_id_fkey (id, full_name, email),
+        company:companies!outcomes_company_id_fkey (id, name, display_name),
+        dispositions (id, label)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // If Sale Made, mark number as sold and notify
+    if (disposition.label === 'Sale Made') {
+      await markNumberSold(normalizedPhone, true);
+      
+      const { data: closer } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', closerId)
+        .single();
+
+      notifySaleMade(company_id, newOutcome, closer?.full_name || 'Unknown');
+    }
+
+    res.status(201).json({ outcome: newOutcome, linkedTo: existingOutcomeId });
+  } catch (err) {
+    console.error('Create linked outcome error:', err);
+    res.status(500).json({ error: 'Failed to create new policy' });
+  }
+});
+
 export default router;

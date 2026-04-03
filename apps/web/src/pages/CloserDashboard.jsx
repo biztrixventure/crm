@@ -4,92 +4,119 @@ import api from '../lib/axios';
 import toast from 'react-hot-toast';
 import { useSearch } from '../hooks/useSearch';
 import { SearchIcon } from 'lucide-animated';
-import { Phone, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Phone, CheckCircle, XCircle, Loader2, Plus } from 'lucide-react';
 import { formatDateTime, cn, normalizePhone } from '../lib/utils';
 import CallbacksManager from '../components/CallbacksManager';
+import NewPolicyForm from '../components/NewPolicyForm';
 
 // Number Search component
 function NumberSearch() {
   const { query, result, isLoading, error, handleQueryChange, clearSearch, submitSearch } = useSearch();
+  const [showNewPolicy, setShowNewPolicy] = useState(false);
 
   return (
-    <div className="bg-white dark:bg-dark-900 rounded-2xl p-6 shadow-lg border border-cream-200/50 dark:border-dark-800/60">
-      <h2 className="text-lg font-semibold text-primary-800 dark:text-primary-200 mb-4">
-        Number Search
-      </h2>
-      
-      <div className="relative">
-        <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleQueryChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              submitSearch();
-            }
-          }}
-          placeholder="Enter phone number..."
-          className="w-full pl-10 pr-24 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
-        />
-        <button
-          type="button"
-          onClick={submitSearch}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold transition-colors"
-        >
-          Search
-        </button>
-        {isLoading && (
-          <Loader2 className="absolute right-20 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 animate-spin" />
-        )}
-      </div>
-
-      {error && (
-          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
-
-      {result && (
-        <div className={cn(
-          'mt-4 p-4 rounded-lg flex items-center gap-3',
-          result.sold
-            ? 'bg-red-50 dark:bg-red-900/50'
-            : 'bg-green-50 dark:bg-green-900/50'
-        )}>
-          {result.sold ? (
-            <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-          ) : (
-            <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+    <>
+      <div className="bg-white dark:bg-dark-900 rounded-2xl p-6 shadow-lg border border-cream-200/50 dark:border-dark-800/60">
+        <h2 className="text-lg font-semibold text-primary-800 dark:text-primary-200 mb-4">
+          Number Search
+        </h2>
+        
+        <div className="relative">
+          <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                submitSearch();
+              }
+            }}
+            placeholder="Enter phone number..."
+            className="w-full pl-10 pr-24 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+          />
+          <button
+            type="button"
+            onClick={submitSearch}
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold transition-colors"
+          >
+            Search
+          </button>
+          {isLoading && (
+            <Loader2 className="absolute right-20 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 animate-spin" />
           )}
-          <div>
-            <p className={cn(
-              'font-semibold',
-              result.sold
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-green-600 dark:text-green-400'
-            )}>
-              {result.sold ? 'SOLD' : 'NOT SOLD'}
-            </p>
-              <p className="text-sm text-primary-500 dark:text-primary-400">
-                {result.phone}
-              </p>
-              <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
-                Source: {result.source === 'cache' ? 'Redis cache' : 'Database'}
-              </p>
-            </div>
+        </div>
+
+        {error && (
+            <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+
+        {result && (
+          <div className={cn(
+            'mt-4 p-4 rounded-lg flex items-center justify-between',
+            result.sold
+              ? 'bg-red-50 dark:bg-red-900/50'
+              : 'bg-green-50 dark:bg-green-900/50'
+          )}>
+            <div className="flex items-center gap-3">
+              {result.sold ? (
+                <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              ) : (
+                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+              )}
+              <div>
+                <p className={cn(
+                  'font-semibold',
+                  result.sold
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-green-600 dark:text-green-400'
+                )}>
+                  {result.sold ? 'SOLD' : 'NOT SOLD'}
+                </p>
+                  <p className="text-sm text-primary-500 dark:text-primary-400">
+                    {result.phone}
+                  </p>
+                  <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
+                    Source: {result.source === 'cache' ? 'Redis cache' : 'Database'}
+                  </p>
+                </div>
+              </div>
+
+            {result.sold && (
+              <button
+                onClick={() => setShowNewPolicy(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition"
+              >
+                <Plus size={18} /> New Policy
+              </button>
+            )}
           </div>
         )}
 
-      {(query || result || error) && (
-        <button
-          type="button"
-          onClick={clearSearch}
-          className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline"
-        >
-          Clear Search
-        </button>
+        {(query || result || error) && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            Clear Search
+          </button>
+        )}
+      </div>
+
+      {showNewPolicy && result?.sold && (
+        <NewPolicyForm
+          existingOutcome={result}
+          onClose={() => setShowNewPolicy(false)}
+          onSuccess={() => {
+            setShowNewPolicy(false);
+            clearSearch();
+            toast.success('New policy created!');
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }
 
