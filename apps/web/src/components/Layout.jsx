@@ -65,11 +65,11 @@ export default function Layout() {
   const navItems = navigation[user?.role] || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-dark-950 dark:via-dark-900 dark:to-dark-800 transition-colors duration-300">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-primary-900/30 dark:bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-primary-900/30 dark:bg-black/80 backdrop-blur-sm lg:hidden"
           onClick={toggleSidebar}
         />
       )}
@@ -77,7 +77,7 @@ export default function Layout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-primary-500 to-primary-400 dark:from-dark-800 dark:to-dark-900 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-primary-500 to-primary-400 dark:from-dark-900 dark:to-dark-950 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl border-r border-transparent dark:border-dark-800',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -127,7 +127,7 @@ export default function Layout() {
 
         {/* Sidebar footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+          <div className="bg-white/10 dark:bg-white/5 backdrop-blur rounded-xl p-3 text-center border border-white/10">
             <p className="text-xs text-white/70">BizTrixVenture v1.0</p>
           </div>
         </div>
@@ -136,11 +136,11 @@ export default function Layout() {
       {/* Main content */}
       <div className={cn('lg:pl-64 min-h-screen flex flex-col')}>
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-cream-200/50 shadow-sm">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-dark-900/80 backdrop-blur-xl border-b border-cream-200/50 dark:border-dark-800/50 shadow-sm transition-colors">
           <div className="flex items-center justify-between h-16 px-4">
             <button
               onClick={toggleSidebar}
-              className="lg:hidden p-2 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-700 text-primary-600 dark:text-primary-300"
+              className="lg:hidden p-2 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-600 dark:text-primary-300 transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -149,20 +149,20 @@ export default function Layout() {
               {/* Theme toggle */}
               <button
                 onClick={toggleTheme}
-                className="p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-700 text-primary-500 dark:text-primary-300 transition-colors"
+                className="p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105"
               >
                 {theme === 'dark' ? (
-                  <Sun className="w-5 h-5" />
+                  <Sun className="w-5 h-5 animate-spin-slow" />
                 ) : (
                   <Moon className="w-5 h-5" />
                 )}
               </button>
 
               {/* Notifications */}
-              <button className="relative p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-700 text-primary-500 dark:text-primary-300 transition-colors">
+              <button className="relative p-2.5 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 text-primary-500 dark:text-primary-300 transition-all hover:scale-105">
                 <Bell className="w-5 h-5" />
                 {notifications.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full text-xs text-white flex items-center justify-center font-bold shadow-lg">
+                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full text-xs text-white flex items-center justify-center font-bold shadow-lg animate-pulse">
                     {notifications.length}
                   </span>
                 )}
@@ -172,7 +172,7 @@ export default function Layout() {
               <div className="relative">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-700 transition-colors"
+                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-cream-100 dark:hover:bg-dark-800 transition-all hover:scale-105"
                 >
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-400 to-primary-500 dark:from-primary-600 dark:to-primary-700 flex items-center justify-center shadow-md">
                     <span className="text-sm font-bold text-white">
@@ -180,24 +180,24 @@ export default function Layout() {
                     </span>
                   </div>
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-semibold text-primary-800 dark:text-primary-200">
+                    <p className="text-sm font-semibold text-primary-800 dark:text-primary-100">
                       {user?.fullName}
                     </p>
                     <p className="text-xs text-primary-500 dark:text-primary-400">
                       {roleLabels[user?.role]}
                     </p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-primary-400 dark:text-primary-300" />
+                  <ChevronDown className={cn("w-4 h-4 text-primary-400 dark:text-primary-300 transition-transform", profileOpen && "rotate-180")} />
                 </button>
 
                 {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-800 rounded-xl shadow-xl border border-cream-200 dark:border-dark-700 py-1 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-900 rounded-xl shadow-xl border border-cream-200 dark:border-dark-800 py-1 overflow-hidden">
                     <button
                       onClick={() => {
                         logout();
                         setProfileOpen(false);
                       }}
-                      className="w-full flex items-center space-x-2 px-4 py-3 text-sm text-primary-700 dark:text-primary-300 hover:bg-cream-50 dark:hover:bg-dark-700 transition-colors"
+                      className="w-full flex items-center space-x-2 px-4 py-3 text-sm text-primary-700 dark:text-primary-200 hover:bg-cream-50 dark:hover:bg-dark-800 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Logout</span>

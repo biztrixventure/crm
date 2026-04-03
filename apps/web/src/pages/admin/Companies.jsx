@@ -110,8 +110,8 @@ export default function Companies() {
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-12 bg-cream-200 rounded-xl w-64" />
-        <div className="h-64 bg-cream-200 rounded-xl" />
+        <div className="h-12 bg-cream-200 dark:bg-dark-800 rounded-xl w-64" />
+        <div className="h-64 bg-cream-200 dark:bg-dark-800 rounded-xl" />
       </div>
     );
   }
@@ -121,15 +121,15 @@ export default function Companies() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-700 to-primary-500 bg-clip-text text-transparent flex items-center gap-2">
-            <Building2 className="w-8 h-8 text-primary-500" />
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-700 to-primary-500 dark:from-primary-400 dark:to-primary-300 bg-clip-text text-transparent flex items-center gap-2">
+            <Building2 className="w-8 h-8 text-primary-500 dark:text-primary-400" />
             Companies Management
           </h1>
-          <p className="text-primary-600/70 mt-1">Manage all companies in the system</p>
+          <p className="text-primary-600/70 dark:text-primary-400/70 mt-1">Manage all companies in the system</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-400 text-white rounded-xl font-medium hover:from-primary-600 hover:to-primary-500 transition-all flex items-center gap-2 shadow-lg shadow-primary-400/30"
+          className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-700 text-white rounded-xl font-medium hover:from-primary-600 hover:to-primary-500 dark:hover:from-primary-500 dark:hover:to-primary-600 transition-all flex items-center gap-2 shadow-lg shadow-primary-400/30 dark:shadow-primary-900/30 hover:scale-105"
         >
           <Plus className="w-5 h-5" />
           Add Company
@@ -138,13 +138,13 @@ export default function Companies() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 dark:text-primary-500" />
         <input
           type="text"
           placeholder="Search companies..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-cream-300 bg-white text-primary-800 placeholder-primary-400/60 focus:ring-2 focus:ring-primary-400 focus:border-primary-400 transition-all"
+          className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-white dark:bg-dark-900/50 text-primary-800 dark:text-primary-100 placeholder-primary-400/60 dark:placeholder-primary-600/60 focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500 focus:border-primary-400 dark:focus:border-primary-500 transition-all"
         />
       </div>
 
@@ -153,57 +153,57 @@ export default function Companies() {
         {filteredCompanies.map((company) => (
           <div
             key={company.id}
-            className="bg-white rounded-2xl p-6 shadow-lg shadow-primary-200/50 border border-cream-200/50 hover:shadow-xl hover:shadow-primary-300/30 transition-all"
+            className="bg-white dark:bg-dark-900/80 rounded-2xl p-6 shadow-lg shadow-primary-200/50 dark:shadow-dark-950/50 border border-cream-200/50 dark:border-dark-800/50 hover:shadow-xl hover:shadow-primary-300/30 dark:hover:shadow-dark-950/70 transition-all hover:scale-105"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-500 dark:from-primary-600 dark:to-primary-700 rounded-xl flex items-center justify-center">
                   <Building2 className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-primary-800">{company.display_name}</h3>
-                  <p className="text-sm text-primary-500">{company.slug}</p>
+                  <h3 className="font-bold text-primary-800 dark:text-primary-100">{company.display_name}</h3>
+                  <p className="text-sm text-primary-500 dark:text-primary-400">{company.slug}</p>
                 </div>
               </div>
               <span
                 className={cn(
                   'px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1',
                   company.is_active
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                 )}
               >
-                <div className={cn('w-2 h-2 rounded-full', company.is_active ? 'bg-green-500' : 'bg-red-500')} />
+                <div className={cn('w-2 h-2 rounded-full animate-pulse', company.is_active ? 'bg-green-500' : 'bg-red-500')} />
                 {company.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
 
             <div className="space-y-2 mb-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-primary-600">Transfers</span>
-                <span className="font-bold text-primary-800">{company.stats?.transferCount || 0}</span>
+                <span className="text-primary-600 dark:text-primary-400">Transfers</span>
+                <span className="font-bold text-primary-800 dark:text-primary-200">{company.stats?.transferCount || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-primary-600">Sales</span>
-                <span className="font-bold text-primary-800">{company.stats?.salesCount || 0}</span>
+                <span className="text-primary-600 dark:text-primary-400">Sales</span>
+                <span className="font-bold text-primary-800 dark:text-primary-200">{company.stats?.salesCount || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-primary-600">Users</span>
-                <span className="font-bold text-primary-800">{company.stats?.userCount || 0}</span>
+                <span className="text-primary-600 dark:text-primary-400">Users</span>
+                <span className="font-bold text-primary-800 dark:text-primary-200">{company.stats?.userCount || 0}</span>
               </div>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => handleEdit(company)}
-                className="flex-1 px-3 py-2 bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-3 py-2 bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
               >
                 <Edit2 className="w-4 h-4" />
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(company.id)}
-                className="flex-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-3 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -215,8 +215,8 @@ export default function Companies() {
 
       {filteredCompanies.length === 0 && (
         <div className="text-center py-12">
-          <Building2 className="w-16 h-16 mx-auto text-primary-300 mb-4" />
-          <p className="text-primary-600">No companies found</p>
+          <Building2 className="w-16 h-16 mx-auto text-primary-300 dark:text-primary-600 mb-4 animate-pulse" />
+          <p className="text-primary-600 dark:text-primary-400">No companies found</p>
         </div>
       )}
 

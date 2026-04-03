@@ -21,17 +21,18 @@
   background: #C49A6C;
 }
 
-/* Custom scrollbar - Dark Mode */
+/* Custom scrollbar - Dark Mode (Black Matte) */
 .dark ::-webkit-scrollbar-track {
-  background: #1a1410;
+  background: #0a0a0a;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #4a3f2f;
+  background: #262626;
+  border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #5a4f3f;
+  background: #404040;
 }
 
 /* Loading animation */
@@ -44,13 +45,26 @@
   }
 }
 
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .animate-pulse-slow {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Dark mode gradient backgrounds */
-.dark .bg-gradient-to-br {
-  filter: brightness(0.7);
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Smooth transitions for dark mode */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 /* Ensure good contrast in dark mode */
@@ -58,9 +72,10 @@
   color-scheme: dark;
 }
 
-/* Base layer improvements */
+/* Base layer improvements - Black Matte Theme */
 @layer base {
   body {
-    @apply bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900;
+    @apply bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-dark-950 dark:via-dark-900 dark:to-dark-800;
   }
 }
+
