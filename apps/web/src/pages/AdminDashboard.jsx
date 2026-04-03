@@ -373,7 +373,7 @@ function AuditLog() {
   const [stats, setStats] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, hasMore: false });
   const [filters, setFilters] = useState({ event: '', from: '', to: '' });
 
   async function fetchAudit(page = 1) {
@@ -385,7 +385,7 @@ function AuditLog() {
         api.get('/audit', {
           params: {
             page,
-            limit: 25,
+            limit: 20,
             event: filters.event || undefined,
             from: filters.from || undefined,
             to: filters.to || undefined,
@@ -397,7 +397,7 @@ function AuditLog() {
       setEvents(eventsRes.data.events || []);
       setStats(statsRes.data.stats || null);
       setLogs(logsRes.data.logs || []);
-      setPagination(logsRes.data.pagination || { page: 1, totalPages: 1 });
+      setPagination(logsRes.data.pagination || { page: 1, hasMore: false });
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to load audit logs');
     } finally {
@@ -414,11 +414,15 @@ function AuditLog() {
       <h1 className="text-2xl font-bold text-primary-800 dark:text-primary-200">Audit Log</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard title="Successful Logins" value={stats?.totalLogins || 0} icon={ShieldCheck} />
-        <MetricCard title="Failed Logins" value={stats?.failedLogins || 0} icon={Activity} />
+        <MetricCard title="Window Logins" value={stats?.windowLogins ?? stats?.totalLogins ?? 0} icon={ShieldCheck} />
+        <MetricCard title="Window Failed" value={stats?.windowFailedLogins ?? stats?.failedLogins ?? 0} icon={Activity} />
         <MetricCard title="Today's Logins" value={stats?.todayLogins || 0} icon={UsersIcon} />
-        <MetricCard title="2FA Setups" value={stats?.twoFaSetups || 0} icon={ShieldCheck} />
+        <MetricCard title="Window 2FA" value={stats?.windowTwoFaSetups ?? stats?.twoFaSetups ?? 0} icon={ShieldCheck} />
       </div>
+
+      <p className="text-xs text-primary-500 dark:text-primary-400">
+        Default window is last 30 days unless you set custom dates.
+      </p>
 
       <div className="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-cream-200 dark:border-dark-800 shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -491,10 +495,10 @@ function AuditLog() {
                 Previous
               </button>
               <p className="text-sm text-primary-600 dark:text-primary-400">
-                Page {pagination.page} of {pagination.totalPages}
+                Page {pagination.page}
               </p>
               <button
-                disabled={pagination.page >= pagination.totalPages}
+                disabled={!pagination.hasMore}
                 onClick={() => fetchAudit(pagination.page + 1)}
                 className="px-3 py-1.5 rounded-lg border border-cream-300 dark:border-dark-700 text-sm text-primary-700 dark:text-primary-300 disabled:opacity-50"
               >

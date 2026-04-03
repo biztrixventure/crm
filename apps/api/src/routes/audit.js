@@ -9,6 +9,22 @@ const router = Router();
 router.use(authenticate);
 router.use(roleGuard('super_admin', 'readonly_admin'));
 
+function getSafePagination(page, limit) {
+  const safePage = Math.max(parseInt(page, 10) || 1, 1);
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+  return { safePage, safeLimit };
+}
+
+function getRecentWindow(from, to) {
+  if (from || to) {
+    return { from, to };
+  }
+  const now = new Date();
+  const last30Days = new Date(now);
+  last30Days.setDate(now.getDate() - 30);
+  return { from: last30Days.toISOString(), to: now.toISOString() };
+}
+
 // GET /audit - List audit logs
 router.get('/', async (req, res) => {
   const { 
@@ -16,45 +32,56 @@ router.get('/', async (req, res) => {
     event, 
     from, 
     to, 
-    page = 1, 
-    limit = 50 
+    page = 1,
+    limit = 20,
   } = req.query;
 
   try {
+    const { safePage, safeLimit } = getSafePagination(page, limit);
+    const dateWindow = getRecentWindow(from, to);
+
     let query = supabase
       .from('audit_logs')
       .select(`
-        *,
+        id,
+        user_id,
+        event,
+        ip_address,
+        user_agent,
+        metadata,
+        created_at,
         user:users!audit_logs_user_id_fkey (
           id,
           email,
           full_name,
           role
         )
-      `, { count: 'exact' })
+      `)
       .order('created_at', { ascending: false });
 
     // Filters
     if (user_id) query = query.eq('user_id', user_id);
     if (event) query = query.eq('event', event);
-    if (from) query = query.gte('created_at', from);
-    if (to) query = query.lte('created_at', to);
+    if (dateWindow.from) query = query.gte('created_at', dateWindow.from);
+    if (dateWindow.to) query = query.lte('created_at', dateWindow.to);
 
-    // Pagination
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    query = query.range(offset, offset + parseInt(limit) - 1);
+    // Pagination without expensive exact count
+    const offset = (safePage - 1) * safeLimit;
+    query = query.range(offset, offset + safeLimit);
 
-    const { data: logs, error, count } = await query;
+    const { data: logs, error } = await query;
 
     if (error) throw error;
+    const rows = logs || [];
+    const hasMore = rows.length > safeLimit;
+    const visibleRows = hasMore ? rows.slice(0, safeLimit) : rows;
 
     res.json({
-      logs,
+      logs: visibleRows,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: count,
-        totalPages: Math.ceil(count / parseInt(limit)),
+        page: safePage,
+        limit: safeLimit,
+        hasMore,
       },
     });
   } catch (err) {
@@ -89,13 +116,9 @@ router.get('/stats', async (req, res) => {
   const { from, to } = req.query;
 
   try {
+    const dateWindow = getRecentWindow(from, to);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    let baseQuery = supabase.from('audit_logs').select('event', { count: 'exact', head: true });
-    
-    if (from) baseQuery = baseQuery.gte('created_at', from);
-    if (to) baseQuery = baseQuery.lte('created_at', to);
 
     const [totalLogins, failedLogins, todayLogins, twoFaSetups] = await Promise.all([
       supabase
@@ -117,12 +140,38 @@ router.get('/stats', async (req, res) => {
         .eq('event', '2fa_setup'),
     ]);
 
+    const [windowLogins, windowFailedLogins, windowTwoFaSetups] = await Promise.all([
+      supabase
+        .from('audit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('event', 'login_success')
+        .gte('created_at', dateWindow.from)
+        .lte('created_at', dateWindow.to),
+      supabase
+        .from('audit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('event', 'login_failed')
+        .gte('created_at', dateWindow.from)
+        .lte('created_at', dateWindow.to),
+      supabase
+        .from('audit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('event', '2fa_setup')
+        .gte('created_at', dateWindow.from)
+        .lte('created_at', dateWindow.to),
+    ]);
+
     res.json({
       stats: {
         totalLogins: totalLogins.count || 0,
         failedLogins: failedLogins.count || 0,
         todayLogins: todayLogins.count || 0,
         twoFaSetups: twoFaSetups.count || 0,
+        windowLogins: windowLogins.count || 0,
+        windowFailedLogins: windowFailedLogins.count || 0,
+        windowTwoFaSetups: windowTwoFaSetups.count || 0,
+        windowFrom: dateWindow.from,
+        windowTo: dateWindow.to,
       },
     });
   } catch (err) {
