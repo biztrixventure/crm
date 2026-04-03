@@ -37,7 +37,7 @@ function KPICard({ title, value, icon: Icon, trend, color = 'primary' }) {
           </p>
           {trend && (
             <p className={cn('text-sm mt-2 flex items-center gap-1', trend > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-              <TrendingUp className="w-4 h-4" />
+              <TrendingUpIcon size={16} />
               {trend > 0 ? '+' : ''}{trend}% from yesterday
             </p>
           )}
@@ -249,7 +249,7 @@ function Dispositions() {
   return (
     <div className="text-center py-12">
       <div className="w-16 h-16 mx-auto bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center mb-4">
-        <Sparkles className="w-8 h-8 text-white" />
+        <SparklesIcon size={32} className="text-white" />
       </div>
       <h3 className="text-xl font-bold text-primary-800 mb-2">Dispositions Management</h3>
       <p className="text-primary-600">Coming soon - Configure call dispositions</p>
