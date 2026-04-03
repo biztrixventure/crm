@@ -3,7 +3,6 @@ version: '3.9'
 services:
   api:
     build: ./apps/api
-    container_name: biztrix-api
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -16,21 +15,13 @@ services:
     expose:
       - "4000"
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
       - biztrix-network
 
   web:
     build: ./apps/web
-    container_name: biztrix-web
     expose:
       - "80"
     depends_on:
@@ -43,32 +34,23 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: biztrix-redis
     restart: unless-stopped
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - biztrix-network
 
   worker:
     build: ./apps/worker
-    container_name: biztrix-worker
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - REDIS_URL=redis://redis:6379
       - API_URL=http://api:4000
     depends_on:
-      redis:
-        condition: service_healthy
-      api:
-        condition: service_healthy
+      - redis
+      - api
     restart: unless-stopped
     networks:
       - biztrix-network
