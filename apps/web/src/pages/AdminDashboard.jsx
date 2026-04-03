@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { formatDateTime, cn } from '../lib/utils';
 import { useAuthStore } from '../store/auth';
+import { Companies } from './admin';
 
 // KPI Card component
 function KPICard({ title, value, icon: Icon, trend, color = 'primary' }) {
@@ -246,16 +247,8 @@ function Overview() {
 }
 
 // Placeholder components for other routes
-function Companies() {
-  return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary-400 to-primary-500 rounded-2xl flex items-center justify-center mb-4">
-        <Building2 className="w-8 h-8 text-white" />
-      </div>
-      <h3 className="text-xl font-bold text-primary-800 mb-2">Companies Management</h3>
-      <p className="text-primary-600">Coming soon - Manage all companies in the system</p>
-    </div>
-  );
+function CompaniesRoute() {
+  return <Companies />;
 }
 
 function UsersPage() {
@@ -298,7 +291,7 @@ export default function AdminDashboard() {
   return (
     <Routes>
       <Route index element={<Overview />} />
-      <Route path="companies/*" element={<Companies />} />
+      <Route path="companies/*" element={<CompaniesRoute />} />
       <Route path="users/*" element={<UsersPage />} />
       <Route path="dispositions/*" element={<Dispositions />} />
       <Route path="audit/*" element={<AuditLog />} />
