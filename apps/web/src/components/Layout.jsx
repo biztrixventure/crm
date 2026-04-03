@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useUIStore } from '../store/ui';
 import { useNotificationStore } from '../store/notifications';
@@ -14,6 +14,7 @@ import {
   BellIcon,
   ChevronDownIcon,
   SparklesIcon,
+  UserIcon,
 } from 'lucide-animated';
 import { Building2, Phone, FileText } from 'lucide-react';
 import { useState } from 'react';
@@ -61,6 +62,7 @@ export default function Layout() {
   const unreadCount = useNotificationStore((state) => state.unreadCount);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
   const location = useLocation();
+  const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -223,10 +225,21 @@ export default function Layout() {
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-900 rounded-xl shadow-xl border border-cream-200 dark:border-dark-800 py-1 overflow-hidden">
                     <button
                       onClick={() => {
-                        logout();
+                        navigate('/profile');
                         setProfileOpen(false);
                       }}
                       className="w-full flex items-center space-x-2 px-4 py-3 text-sm text-primary-700 dark:text-primary-200 hover:bg-cream-50 dark:hover:bg-dark-800 transition-colors"
+                    >
+                      <UserIcon size={16} />
+                      <span>My Profile</span>
+                    </button>
+                    <hr className="border-cream-200 dark:border-dark-700" />
+                    <button
+                      onClick={() => {
+                        logout();
+                        setProfileOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-2 px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <LogoutIcon size={16} />
                       <span>Logout</span>

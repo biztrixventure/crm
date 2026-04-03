@@ -280,4 +280,208 @@ router.get('/closers/list', async (req, res) => {
   }
 });
 
+// GET /users/me/profile - Get current user's profile
+router.get('/me/profile', async (req, res) => {
+  const { id } = req.user;
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        totp_enabled,
+        created_at,
+        last_login,
+        companies!users_company_id_fkey (
+          id,
+          name,
+          display_name,
+          logo_url
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get user stats
+    const stats = {};
+    
+    if (user.role === 'fronter') {
+      const { count: transferCount } = await supabase
+        .from('transfers')
+        .select('id', { count: 'exact', head: true })
+        .eq('fronter_id', id);
+      stats.totalTransfers = transferCount || 0;
+    } else if (user.role === 'closer') {
+      const [{ count: outcomeCount }, { count: saleCount }] = await Promise.all([
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id),
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id).not('revenue', 'is', null),
+      ]);
+      stats.totalOutcomes = outcomeCount || 0;
+      stats.totalSales = saleCount || 0;
+    }
+
+    res.json({ user, stats });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// PATCH /users/me/profile - Update current user's profile
+router.patch('/me/profile', async (req, res) => {
+  const { id } = req.user;
+  const { full_name } = req.body;
+
+  // Users can only update their own name (not email, role, etc.)
+  if (!full_name || full_name.trim().length < 2) {
+    return res.status(422).json({ error: 'Full name must be at least 2 characters' });
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({ full_name: full_name.trim() })
+      .eq('id', id)
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        totp_enabled,
+        created_at,
+        companies!users_company_id_fkey (
+          id,
+          name,
+          display_name
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    res.json({ user });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// GET /users/:id/profile - View another user's profile (admin/company admin only)
+router.get('/:id/profile', async (req, res) => {
+  const { id } = req.params;
+  const { role, companyId, id: currentUserId } = req.user;
+
+  // Users can view their own profile
+  if (id === currentUserId) {
+    // Redirect to /me/profile logic
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          full_name,
+          role,
+          company_id,
+          is_active,
+          totp_enabled,
+          created_at,
+          last_login,
+          companies!users_company_id_fkey (
+            id,
+            name,
+            display_name
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error || !user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      return res.json({ user, canEdit: true });
+    } catch (err) {
+      console.error('Get profile error:', err);
+      return res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+  }
+
+  // Only super_admin, readonly_admin, and company_admin can view other profiles
+  if (!['super_admin', 'readonly_admin', 'company_admin'].includes(role)) {
+    return res.status(403).json({ error: 'Not authorized to view this profile' });
+  }
+
+  try {
+    let query = supabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        totp_enabled,
+        created_at,
+        last_login,
+        companies!users_company_id_fkey (
+          id,
+          name,
+          display_name
+        )
+      `)
+      .eq('id', id);
+
+    // Company admins can only view their company's users
+    if (role === 'company_admin') {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { data: user, error } = await query.single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found or not accessible' });
+    }
+
+    // Get user stats
+    const stats = {};
+    
+    if (user.role === 'fronter') {
+      const { count: transferCount } = await supabase
+        .from('transfers')
+        .select('id', { count: 'exact', head: true })
+        .eq('fronter_id', id);
+      stats.totalTransfers = transferCount || 0;
+    } else if (user.role === 'closer') {
+      const [{ count: outcomeCount }, { count: saleCount }] = await Promise.all([
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id),
+        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id).not('revenue', 'is', null),
+      ]);
+      stats.totalOutcomes = outcomeCount || 0;
+      stats.totalSales = saleCount || 0;
+    }
+
+    // Determine if current user can edit this profile
+    const canEdit = role === 'super_admin' || 
+      (role === 'company_admin' && user.company_id === companyId && user.role === 'fronter');
+
+    res.json({ user, stats, canEdit });
+  } catch (err) {
+    console.error('Get user profile error:', err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
 export default router;

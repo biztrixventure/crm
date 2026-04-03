@@ -10,6 +10,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import CloserDashboard from './pages/CloserDashboard';
 import FronterDashboard from './pages/FronterDashboard';
+import Profile from './pages/Profile';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -90,6 +91,24 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['fronter']}>
               <FronterDashboard />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Profile routes - accessible by all authenticated users */}
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/profile/:userId" 
+          element={
+            <ProtectedRoute allowedRoles={['super_admin', 'readonly_admin', 'company_admin']}>
+              <Profile />
             </ProtectedRoute>
           } 
         />
