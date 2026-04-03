@@ -1,27 +1,31 @@
 import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
-import { getRedis } from './redis.js';
+import { getRedis, isRedisConnected } from './redis.js';
 
 let io = null;
 
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+      origin: process.env.FRONTEND_URL === '*' ? true : (process.env.FRONTEND_URL || 'http://localhost:5173'),
       credentials: true,
     },
     transports: ['websocket', 'polling'],
   });
 
-  // Setup Redis adapter for horizontal scaling
-  try {
-    const redis = getRedis();
-    const pubClient = redis.duplicate();
-    const subClient = redis.duplicate();
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log('✅ Socket.io Redis adapter initialized');
-  } catch (err) {
-    console.warn('Socket.io running without Redis adapter:', err.message);
+  // Setup Redis adapter for horizontal scaling (optional)
+  if (isRedisConnected()) {
+    try {
+      const { createAdapter } = await import('@socket.io/redis-adapter');
+      const redis = getRedis();
+      const pubClient = redis.duplicate();
+      const subClient = redis.duplicate();
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log('✅ Socket.io Redis adapter initialized');
+    } catch (err) {
+      console.warn('Socket.io running without Redis adapter:', err.message);
+    }
+  } else {
+    console.log('🔄 Socket.io running without Redis adapter (Redis not connected)');
   }
 
   io.on('connection', (socket) => {
