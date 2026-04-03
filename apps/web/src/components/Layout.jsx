@@ -37,6 +37,7 @@ const navigation = {
     { name: 'Dashboard', href: '/company', icon: HomeIcon },
     { name: 'Transfers', href: '/company/transfers', icon: Phone },
     { name: 'Outcomes', href: '/company/outcomes', icon: FileText },
+    { name: 'Callbacks', href: '/company/callbacks', icon: Phone },
     { name: 'Fronters', href: '/company/fronters', icon: UsersIcon },
     { name: 'Number Lists', href: '/company/numbers', icon: FileText },
   ],

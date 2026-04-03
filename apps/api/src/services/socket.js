@@ -37,6 +37,12 @@ export function initSocket(httpServer) {
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });
+
+    // Worker emits this event when callback time is due
+    socket.on('callback:fire', ({ userId, callback }) => {
+      if (!userId || !callback) return;
+      notifyCallbackDue(userId, callback);
+    });
   });
 
   return io;

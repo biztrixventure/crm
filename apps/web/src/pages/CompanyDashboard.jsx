@@ -11,6 +11,7 @@ import {
   Download,
 } from 'lucide-react';
 import { formatDateTime, cn } from '../lib/utils';
+import CallbacksManager from '../components/CallbacksManager';
 
 // KPI Card component
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
@@ -200,6 +201,10 @@ function Numbers() {
   return <div className="text-gray-900 dark:text-white">Number Lists - Coming soon</div>;
 }
 
+function Callbacks() {
+  return <CallbacksManager title="Company Callbacks" />;
+}
+
 export default function CompanyDashboard() {
   return (
     <Routes>
@@ -208,6 +213,7 @@ export default function CompanyDashboard() {
       <Route path="outcomes/*" element={<Outcomes />} />
       <Route path="fronters/*" element={<Fronters />} />
       <Route path="numbers/*" element={<Numbers />} />
+      <Route path="callbacks/*" element={<Callbacks />} />
     </Routes>
   );
 }

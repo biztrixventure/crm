@@ -6,6 +6,7 @@ import { useSearch } from '../hooks/useSearch';
 import { SearchIcon } from 'lucide-animated';
 import { Phone, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { formatDateTime, cn, normalizePhone } from '../lib/utils';
+import CallbacksManager from '../components/CallbacksManager';
 
 // Number Search component
 function NumberSearch() {
@@ -308,7 +309,7 @@ function Outcomes() {
 }
 
 function Callbacks() {
-  return <div className="text-primary-800 dark:text-primary-200">Callbacks - Coming soon</div>;
+  return <CallbacksManager title="My Callbacks" />;
 }
 
 function OutcomesTable({ compact = false }) {

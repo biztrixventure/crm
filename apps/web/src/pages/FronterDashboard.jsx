@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { PlusIcon, SearchIcon } from 'lucide-animated';
 import { Phone, Send, Loader2 } from 'lucide-react';
 import { formatDateTime, cn, normalizePhone } from '../lib/utils';
+import CallbacksManager from '../components/CallbacksManager';
 
 const initialForm = {
   closer_id: '',
@@ -268,7 +269,7 @@ function Numbers() {
 }
 
 function Callbacks() {
-  return <div className="text-primary-800 dark:text-primary-200">Callbacks - Coming soon</div>;
+  return <CallbacksManager title="My Callbacks" />;
 }
 
 export default function FronterDashboard() {
