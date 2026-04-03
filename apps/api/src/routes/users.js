@@ -14,6 +14,8 @@ router.use(authenticate);
 // GET /users - List users (scoped by role)
 router.get('/', async (req, res) => {
   const { role, companyId } = req.user;
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const offset = parseInt(req.query.offset) || 0;
 
   try {
     let query = supabase
@@ -32,19 +34,28 @@ router.get('/', async (req, res) => {
           name,
           display_name
         )
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     // Company admins can only see their own company's users
     if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
     }
 
-    const { data: users, error } = await query;
+    const { data: users, error, count } = await query;
 
     if (error) throw error;
 
-    res.json({ users });
+    res.json({ 
+      users: users || [],
+      pagination: {
+        total: count || 0,
+        limit,
+        offset,
+        hasMore: count > offset + limit
+      }
+    });
   } catch (err) {
     console.error('Get users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });

@@ -56,7 +56,7 @@ export default function UsersPage() {
 
   async function fetchUsers() {
     try {
-      const usersRes = await api.get('/users', { timeout: 15000 });
+      const usersRes = await api.get('/users?limit=100', { timeout: 30000 });
       setUsers(usersRes.data.users || []);
     } catch (error) {
       console.error('Failed to fetch users data:', error);
