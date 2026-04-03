@@ -2,23 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar - Light Mode */
+/* Custom scrollbar - Light Mode (Darker tones) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #FFF2D7;
+  background: #E4D4BE;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D8AE7E;
+  background: #A8885C;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #C49A6C;
+  background: #8B7049;
 }
 
 /* Custom scrollbar - Dark Mode (Black Matte) */
@@ -72,10 +72,10 @@
   color-scheme: dark;
 }
 
-/* Base layer improvements - Black Matte Theme */
+/* Base layer improvements - Darker Light Theme */
 @layer base {
   body {
-    @apply bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-dark-950 dark:via-dark-900 dark:to-dark-800;
+    @apply bg-gradient-to-br from-cream-200 via-cream-100 to-cream-50 dark:from-dark-950 dark:via-dark-900 dark:to-dark-800;
   }
 }
 
