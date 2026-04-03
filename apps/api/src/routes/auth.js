@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import supabase from '../services/supabase.js';
+import supabase, { supabaseAuth } from '../services/supabase.js';
 import { authenticate, generateToken, generateTotpIntermediateToken } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { authLimiter } from '../middleware/rateLimit.js';
@@ -24,8 +24,8 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   const userAgent = req.headers['user-agent'];
 
   try {
-    // Authenticate with Supabase
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    // Authenticate with Supabase using anon client
+    const { data: authData, error: authError } = await supabaseAuth.auth.signInWithPassword({
       email,
       password,
     });
