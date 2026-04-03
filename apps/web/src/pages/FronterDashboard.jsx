@@ -265,7 +265,104 @@ function Transfers() {
 }
 
 function Numbers() {
-  return <div className="text-primary-800 dark:text-primary-200">My Numbers - Coming soon</div>;
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+
+  async function fetchNumbers(targetPage = 1) {
+    try {
+      setLoading(true);
+      const res = await api.get('/numbers/my', {
+        params: { page: targetPage, limit: 50 },
+        timeout: 12000,
+      });
+      setItems(res.data.numbers || []);
+      setPagination(res.data.pagination || { page: targetPage, totalPages: 1, total: 0 });
+      setPage(targetPage);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load your numbers');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchNumbers(1);
+  }, []);
+
+  const filtered = items.filter((n) => {
+    const q = query.toLowerCase();
+    return (
+      (n.phone_number || '').toLowerCase().includes(q) ||
+      (n.number_lists?.file_name || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) {
+    return <div className="h-32 rounded-xl bg-cream-200 dark:bg-dark-800 animate-pulse" />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-primary-800 dark:text-primary-200">My Numbers</h1>
+      <div className="bg-white/80 dark:bg-dark-900/80 rounded-2xl border border-cream-200/60 dark:border-dark-800/60 shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-cream-200/60 dark:border-dark-800/60 flex items-center justify-between">
+          <h3 className="font-semibold text-primary-800 dark:text-primary-200">Assigned Numbers</h3>
+          <div className="relative w-64 max-w-full">
+            <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search number or list..."
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-cream-300 dark:border-dark-700 bg-white dark:bg-dark-800 text-sm text-primary-800 dark:text-primary-100"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-cream-100 dark:bg-dark-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Phone</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">List</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Assigned</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-cream-200 dark:divide-dark-800">
+              {filtered.map((n) => (
+                <tr key={n.id} className="hover:bg-cream-50 dark:hover:bg-dark-800/40">
+                  <td className="px-4 py-3 text-sm text-primary-800 dark:text-primary-100">{n.phone_number}</td>
+                  <td className="px-4 py-3 text-sm text-primary-700 dark:text-primary-300">{n.number_lists?.file_name || '-'}</td>
+                  <td className="px-4 py-3 text-xs text-primary-500 dark:text-primary-400">{formatDateTime(n.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!filtered.length && <p className="p-4 text-sm text-primary-500 dark:text-primary-400">No numbers found.</p>}
+        <div className="p-3 border-t border-cream-200/60 dark:border-dark-800/60 flex items-center justify-between">
+          <button
+            disabled={page <= 1}
+            onClick={() => fetchNumbers(page - 1)}
+            className="px-3 py-1.5 text-sm rounded-lg border border-cream-300 dark:border-dark-700 text-primary-700 dark:text-primary-300 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <p className="text-sm text-primary-600 dark:text-primary-400">
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+          </p>
+          <button
+            disabled={page >= pagination.totalPages}
+            onClick={() => fetchNumbers(page + 1)}
+            className="px-3 py-1.5 text-sm rounded-lg border border-cream-300 dark:border-dark-700 text-primary-700 dark:text-primary-300 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Callbacks() {
