@@ -2,35 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar */
+/* Custom scrollbar - Light Mode */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #FFF2D7;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #D8AE7E;
   border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+::-webkit-scrollbar-thumb:hover {
+  background: #C49A6C;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+/* Custom scrollbar - Dark Mode */
+.dark ::-webkit-scrollbar-track {
+  background: #1a1410;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4a3f2f;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #5a4f3f;
 }
 
 /* Loading animation */
@@ -45,4 +46,21 @@
 
 .animate-pulse-slow {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dark mode gradient backgrounds */
+.dark .bg-gradient-to-br {
+  filter: brightness(0.7);
+}
+
+/* Ensure good contrast in dark mode */
+.dark {
+  color-scheme: dark;
+}
+
+/* Base layer improvements */
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-cream-100 via-cream-50 to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900;
+  }
 }
