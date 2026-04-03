@@ -190,15 +190,290 @@ function Overview() {
 }
 
 function Transfers() {
-  return <div className="text-gray-900 dark:text-white">Transfers - Coming soon</div>;
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+
+  async function fetchTransfers(targetPage = 1) {
+    try {
+      setLoading(true);
+      const res = await api.get('/transfers', {
+        params: { page: targetPage, limit: 50 },
+        timeout: 12000,
+      });
+      setItems(res.data.transfers || []);
+      setPagination(res.data.pagination || { page: targetPage, totalPages: 1, total: 0 });
+      setPage(targetPage);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load transfers');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTransfers(1);
+  }, []);
+
+  const filtered = items.filter((t) => {
+    const q = query.toLowerCase();
+    return (
+      (t.customer_name || '').toLowerCase().includes(q) ||
+      (t.customer_phone || '').toLowerCase().includes(q) ||
+      (t.fronter?.full_name || '').toLowerCase().includes(q) ||
+      (t.closer?.full_name || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <div className="h-32 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Company Transfers</h1>
+      <DataTable
+        query={query}
+        setQuery={setQuery}
+        placeholder="Search customer, phone, fronter, closer..."
+        headers={['Customer', 'Phone', 'Fronter', 'Closer', 'Created']}
+        rows={filtered.map((t) => [
+          t.customer_name,
+          formatPhone(t.customer_phone),
+          t.fronter?.full_name || '-',
+          t.closer?.full_name || '-',
+          formatDateTime(t.created_at),
+        ])}
+        emptyText="No transfers found."
+      />
+      <Pager
+        page={page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        onPrev={() => fetchTransfers(page - 1)}
+        onNext={() => fetchTransfers(page + 1)}
+      />
+    </div>
+  );
 }
 
 function Outcomes() {
-  return <div className="text-gray-900 dark:text-white">Outcomes - Coming soon</div>;
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+
+  async function fetchOutcomes(targetPage = 1) {
+    try {
+      setLoading(true);
+      const res = await api.get('/outcomes', {
+        params: { page: targetPage, limit: 50 },
+        timeout: 12000,
+      });
+      setItems(res.data.outcomes || []);
+      setPagination(res.data.pagination || { page: targetPage, totalPages: 1, total: 0 });
+      setPage(targetPage);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load outcomes');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchOutcomes(1);
+  }, []);
+
+  const filtered = items.filter((o) => {
+    const q = query.toLowerCase();
+    return (
+      (o.customer_name || '').toLowerCase().includes(q) ||
+      (o.customer_phone || '').toLowerCase().includes(q) ||
+      (o.dispositions?.label || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <div className="h-32 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Company Outcomes</h1>
+      <DataTable
+        query={query}
+        setQuery={setQuery}
+        placeholder="Search customer, phone, disposition..."
+        headers={['Customer', 'Phone', 'Disposition', 'Closer', 'Created']}
+        rows={filtered.map((o) => [
+          o.customer_name,
+          formatPhone(o.customer_phone),
+          o.dispositions?.label || '-',
+          o.closer?.full_name || '-',
+          formatDateTime(o.created_at),
+        ])}
+        emptyText="No outcomes found."
+      />
+      <Pager
+        page={page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        onPrev={() => fetchOutcomes(page - 1)}
+        onNext={() => fetchOutcomes(page + 1)}
+      />
+    </div>
+  );
 }
 
 function Fronters() {
-  return <div className="text-gray-900 dark:text-white">Fronters - Coming soon</div>;
+  const [fronters, setFronters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [updatingId, setUpdatingId] = useState(null);
+
+  async function fetchFronters() {
+    try {
+      setLoading(true);
+      const res = await api.get('/users', { timeout: 12000 });
+      const scopedFronters = (res.data.users || []).filter((u) => u.role === 'fronter');
+      setFronters(scopedFronters);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load fronters');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchFronters();
+  }, []);
+
+  async function toggleActive(user) {
+    try {
+      setUpdatingId(user.id);
+      await api.patch(`/users/${user.id}`, { is_active: !user.is_active }, { timeout: 10000 });
+      toast.success(`Fronter ${user.is_active ? 'deactivated' : 'activated'}`);
+      await fetchFronters();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to update fronter');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  const filtered = fronters.filter((u) => {
+    const q = query.toLowerCase();
+    return (
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <div className="h-32 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Company Fronters</h1>
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search fronter..."
+            className="w-full md:w-80 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-900/40">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {filtered.map((u) => (
+                <tr key={u.id}>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{u.full_name}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{u.email}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{u.is_active ? 'Active' : 'Inactive'}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => toggleActive(u)}
+                      disabled={updatingId === u.id}
+                      className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                    >
+                      {updatingId === u.id ? 'Updating...' : u.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!filtered.length && <p className="p-4 text-sm text-gray-500 dark:text-gray-400">No fronters found.</p>}
+      </div>
+    </div>
+  );
+}
+
+function DataTable({ query, setQuery, placeholder, headers, rows, emptyText }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="w-full md:w-96 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 dark:bg-gray-900/40">
+            <tr>
+              {headers.map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {rows.map((row, idx) => (
+              <tr key={idx}>
+                {row.map((cell, i) => (
+                  <td key={i} className="px-4 py-3 text-sm text-gray-900 dark:text-white">{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!rows.length && <p className="p-4 text-sm text-gray-500 dark:text-gray-400">{emptyText}</p>}
+    </div>
+  );
+}
+
+function Pager({ page, totalPages, total, onPrev, onNext }) {
+  return (
+    <div className="flex items-center justify-between">
+      <button
+        disabled={page <= 1}
+        onClick={onPrev}
+        className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+      >
+        Previous
+      </button>
+      <p className="text-sm text-gray-600 dark:text-gray-400">Page {page} of {totalPages} ({total} total)</p>
+      <button
+        disabled={page >= totalPages}
+        onClick={onNext}
+        className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+  );
 }
 
 function Numbers() {

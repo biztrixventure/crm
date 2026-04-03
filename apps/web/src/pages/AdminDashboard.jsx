@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import api from '../lib/axios';
+import toast from 'react-hot-toast';
 import {
   UsersIcon,
   TrendingUpIcon,
-  SparklesIcon,
 } from 'lucide-animated';
-import { Building2, DollarSign, Clock, Plus, Search, Star, Phone } from 'lucide-react';
+import { Building2, DollarSign, Plus, Star, Phone, Loader2, ShieldCheck, Activity, Save } from 'lucide-react';
 import { formatDateTime, cn } from '../lib/utils';
 import { useAuthStore } from '../store/auth';
 import { Companies, Users } from './admin';
@@ -246,25 +246,280 @@ function UsersPage() {
 }
 
 function Dispositions() {
+  const [dispositions, setDispositions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ label: '', is_default: false });
+
+  async function fetchDispositions() {
+    try {
+      setLoading(true);
+      const res = await api.get('/dispositions', { timeout: 10000 });
+      setDispositions(res.data.dispositions || []);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load dispositions');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchDispositions();
+  }, []);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await api.post('/dispositions', form, { timeout: 10000 });
+      toast.success('Disposition created');
+      setForm({ label: '', is_default: false });
+      await fetchDispositions();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to create disposition');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(item) {
+    try {
+      await api.patch(`/dispositions/${item.id}`, { is_active: false }, { timeout: 10000 });
+      toast.success('Disposition deactivated');
+      await fetchDispositions();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to deactivate disposition');
+    }
+  }
+
   return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center mb-4">
-        <SparklesIcon size={32} className="text-white" />
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-primary-800 dark:text-primary-200">Dispositions Management</h1>
+
+      <div className="bg-white dark:bg-dark-900 rounded-2xl p-5 border border-cream-200 dark:border-dark-800 shadow-lg">
+        <h2 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">Create Disposition</h2>
+        <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            required
+            value={form.label}
+            onChange={(e) => setForm((s) => ({ ...s, label: e.target.value }))}
+            placeholder="Disposition label"
+            className="md:col-span-2 px-3 py-2.5 rounded-xl border border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+          />
+          <label className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">
+            <input
+              type="checkbox"
+              checked={form.is_default}
+              onChange={(e) => setForm((s) => ({ ...s, is_default: e.target.checked }))}
+            />
+            Default
+          </label>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save
+          </button>
+        </form>
       </div>
-      <h3 className="text-xl font-bold text-primary-800 mb-2">Dispositions Management</h3>
-      <p className="text-primary-600">Coming soon - Configure call dispositions</p>
+
+      <div className="bg-white dark:bg-dark-900 rounded-2xl border border-cream-200 dark:border-dark-800 shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-cream-200 dark:border-dark-800">
+          <h3 className="font-semibold text-primary-800 dark:text-primary-200">Active Dispositions</h3>
+        </div>
+        {loading ? (
+          <div className="p-4 text-sm text-primary-500 dark:text-primary-400">Loading...</div>
+        ) : dispositions.length === 0 ? (
+          <div className="p-4 text-sm text-primary-500 dark:text-primary-400">No dispositions found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-cream-100 dark:bg-dark-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Label</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Default</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cream-200 dark:divide-dark-800">
+                {dispositions.map((d) => (
+                  <tr key={d.id}>
+                    <td className="px-4 py-3 text-sm text-primary-800 dark:text-primary-100">{d.label}</td>
+                    <td className="px-4 py-3 text-sm text-primary-700 dark:text-primary-300">{d.is_default ? 'Yes' : 'No'}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        disabled={d.is_default}
+                        onClick={() => toggleActive(d)}
+                        className="px-3 py-1.5 rounded-lg border border-cream-300 dark:border-dark-700 text-xs text-primary-700 dark:text-primary-300 disabled:opacity-40"
+                      >
+                        Deactivate
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function AuditLog() {
+  const [logs, setLogs] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+  const [filters, setFilters] = useState({ event: '', from: '', to: '' });
+
+  async function fetchAudit(page = 1) {
+    try {
+      setLoading(true);
+      const [eventsRes, statsRes, logsRes] = await Promise.all([
+        api.get('/audit/events', { timeout: 10000 }),
+        api.get('/audit/stats', { params: { from: filters.from || undefined, to: filters.to || undefined }, timeout: 10000 }),
+        api.get('/audit', {
+          params: {
+            page,
+            limit: 25,
+            event: filters.event || undefined,
+            from: filters.from || undefined,
+            to: filters.to || undefined,
+          },
+          timeout: 12000,
+        }),
+      ]);
+
+      setEvents(eventsRes.data.events || []);
+      setStats(statsRes.data.stats || null);
+      setLogs(logsRes.data.logs || []);
+      setPagination(logsRes.data.pagination || { page: 1, totalPages: 1 });
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load audit logs');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchAudit(1);
+  }, []);
+
   return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-green-400 to-green-500 rounded-2xl flex items-center justify-center mb-4">
-        <Search className="w-8 h-8 text-white" />
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-primary-800 dark:text-primary-200">Audit Log</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard title="Successful Logins" value={stats?.totalLogins || 0} icon={ShieldCheck} />
+        <MetricCard title="Failed Logins" value={stats?.failedLogins || 0} icon={Activity} />
+        <MetricCard title="Today's Logins" value={stats?.todayLogins || 0} icon={UsersIcon} />
+        <MetricCard title="2FA Setups" value={stats?.twoFaSetups || 0} icon={ShieldCheck} />
       </div>
-      <h3 className="text-xl font-bold text-primary-800 mb-2">Audit Log</h3>
-      <p className="text-primary-600">Coming soon - View system activity logs</p>
+
+      <div className="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-cream-200 dark:border-dark-800 shadow-lg">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <select
+            value={filters.event}
+            onChange={(e) => setFilters((s) => ({ ...s, event: e.target.value }))}
+            className="px-3 py-2.5 rounded-xl border border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+          >
+            <option value="">All Events</option>
+            {events.map((ev) => (
+              <option key={ev} value={ev}>{ev}</option>
+            ))}
+          </select>
+          <input
+            type="datetime-local"
+            value={filters.from}
+            onChange={(e) => setFilters((s) => ({ ...s, from: e.target.value }))}
+            className="px-3 py-2.5 rounded-xl border border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+          />
+          <input
+            type="datetime-local"
+            value={filters.to}
+            onChange={(e) => setFilters((s) => ({ ...s, to: e.target.value }))}
+            className="px-3 py-2.5 rounded-xl border border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+          />
+          <button
+            onClick={() => fetchAudit(1)}
+            className="px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium"
+          >
+            Apply Filters
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-dark-900 rounded-2xl border border-cream-200 dark:border-dark-800 shadow-lg overflow-hidden">
+        {loading ? (
+          <div className="p-4 text-sm text-primary-500 dark:text-primary-400">Loading logs...</div>
+        ) : logs.length === 0 ? (
+          <div className="p-4 text-sm text-primary-500 dark:text-primary-400">No audit events found.</div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-cream-100 dark:bg-dark-800">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Time</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Event</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">IP</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cream-200 dark:divide-dark-800">
+                  {logs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="px-4 py-3 text-sm text-primary-800 dark:text-primary-100">{formatDateTime(log.created_at)}</td>
+                      <td className="px-4 py-3 text-sm text-primary-700 dark:text-primary-300">{log.user?.full_name || 'System'}</td>
+                      <td className="px-4 py-3 text-sm text-primary-700 dark:text-primary-300">{log.event}</td>
+                      <td className="px-4 py-3 text-sm text-primary-500 dark:text-primary-400">{log.ip_address || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-3 border-t border-cream-200 dark:border-dark-800 flex items-center justify-between">
+              <button
+                disabled={pagination.page <= 1}
+                onClick={() => fetchAudit(pagination.page - 1)}
+                className="px-3 py-1.5 rounded-lg border border-cream-300 dark:border-dark-700 text-sm text-primary-700 dark:text-primary-300 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <p className="text-sm text-primary-600 dark:text-primary-400">
+                Page {pagination.page} of {pagination.totalPages}
+              </p>
+              <button
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => fetchAudit(pagination.page + 1)}
+                className="px-3 py-1.5 rounded-lg border border-cream-300 dark:border-dark-700 text-sm text-primary-700 dark:text-primary-300 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ title, value, icon: Icon }) {
+  return (
+    <div className="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-cream-200 dark:border-dark-800 shadow-lg">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-primary-500 dark:text-primary-400">{title}</p>
+          <p className="text-2xl font-bold text-primary-800 dark:text-primary-200 mt-1">{value}</p>
+        </div>
+        <div className="p-2 rounded-xl bg-primary-100 dark:bg-primary-900/30">
+          <Icon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+        </div>
+      </div>
     </div>
   );
 }
