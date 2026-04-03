@@ -117,29 +117,9 @@ router.get('/stats', async (req, res) => {
 
   try {
     const dateWindow = getRecentWindow(from, to);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    const [totalLogins, failedLogins, todayLogins, twoFaSetups] = await Promise.all([
-      supabase
-        .from('audit_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('event', 'login_success'),
-      supabase
-        .from('audit_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('event', 'login_failed'),
-      supabase
-        .from('audit_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('event', 'login_success')
-        .gte('created_at', today.toISOString()),
-      supabase
-        .from('audit_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('event', '2fa_setup'),
-    ]);
-
+    // Only get counts for the windowed period (last 30 days by default)
+    // Skip all-time counts as they can cause timeouts on large tables
     const [windowLogins, windowFailedLogins, windowTwoFaSetups] = await Promise.all([
       supabase
         .from('audit_logs')
@@ -163,20 +143,18 @@ router.get('/stats', async (req, res) => {
 
     res.json({
       stats: {
-        totalLogins: totalLogins.count || 0,
-        failedLogins: failedLogins.count || 0,
-        todayLogins: todayLogins.count || 0,
-        twoFaSetups: twoFaSetups.count || 0,
         windowLogins: windowLogins.count || 0,
         windowFailedLogins: windowFailedLogins.count || 0,
         windowTwoFaSetups: windowTwoFaSetups.count || 0,
-        windowFrom: dateWindow.from,
-        windowTo: dateWindow.to,
+        period: {
+          from: dateWindow.from,
+          to: dateWindow.to,
+        }
       },
     });
   } catch (err) {
     console.error('Get audit stats error:', err);
-    res.status(500).json({ error: 'Failed to fetch audit stats' });
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 

@@ -413,11 +413,10 @@ function AuditLog() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-primary-800 dark:text-primary-200">Audit Log</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard title="Window Logins" value={stats?.windowLogins ?? stats?.totalLogins ?? 0} icon={ShieldCheck} />
-        <MetricCard title="Window Failed" value={stats?.windowFailedLogins ?? stats?.failedLogins ?? 0} icon={Activity} />
-        <MetricCard title="Today's Logins" value={stats?.todayLogins || 0} icon={UsersIcon} />
-        <MetricCard title="Window 2FA" value={stats?.windowTwoFaSetups ?? stats?.twoFaSetups ?? 0} icon={ShieldCheck} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MetricCard title="Window Logins" value={stats?.windowLogins || 0} icon={ShieldCheck} />
+        <MetricCard title="Failed Logins" value={stats?.windowFailedLogins || 0} icon={Activity} />
+        <MetricCard title="2FA Setups" value={stats?.windowTwoFaSetups || 0} icon={ShieldCheck} />
       </div>
 
       <p className="text-xs text-primary-500 dark:text-primary-400">
