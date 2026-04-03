@@ -1,7 +1,14 @@
 import jwt from 'jsonwebtoken';
 import supabase from '../services/supabase.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+// Get JWT_SECRET at function call time, not module load time
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  return secret;
+}
 
 export async function authenticate(req, res, next) {
   try {
@@ -14,7 +21,7 @@ export async function authenticate(req, res, next) {
     const token = authHeader.split(' ')[1];
     
     // Verify JWT
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     
     // Check if it's a TOTP intermediate token
     if (decoded.step === 'totp') {
@@ -81,11 +88,11 @@ export async function authenticate(req, res, next) {
 
 // Generate tokens
 export function generateToken(userId, expiresIn = '8h') {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn });
+  return jwt.sign({ userId }, getJwtSecret(), { expiresIn });
 }
 
 export function generateTotpIntermediateToken(userId) {
-  return jwt.sign({ userId, step: 'totp' }, JWT_SECRET, { expiresIn: '5m' });
+  return jwt.sign({ userId, step: 'totp' }, getJwtSecret(), { expiresIn: '5m' });
 }
 
 export default { authenticate, generateToken, generateTotpIntermediateToken };

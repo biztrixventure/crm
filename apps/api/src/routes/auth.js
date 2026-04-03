@@ -132,8 +132,9 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('Login error:', err.message || err);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ error: 'Login failed', details: process.env.NODE_ENV !== 'production' ? err.message : undefined });
   }
 });
 
