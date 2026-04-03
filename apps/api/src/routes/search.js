@@ -5,7 +5,7 @@ import { roleGuard, featureGuard } from '../middleware/role.js';
 import { validateQuery } from '../middleware/validate.js';
 import { searchNumberSchema } from '../schemas/number.schema.js';
 import { searchLimiter } from '../middleware/rateLimit.js';
-import { getRedis, isNumberSold, markNumberSold } from '../services/redis.js';
+import { getRedis, isRedisConnected, markNumberSold } from '../services/redis.js';
 
 const router = Router();
 
@@ -43,17 +43,19 @@ router.get(
     try {
       const normalizedPhone = normalizeToE164(phone);
 
-      // Check Redis cache first
+      // Check Redis cache first when available
       const redis = getRedis();
-      const cacheKey = `sold:${normalizedPhone}`;
-      const cached = await redis.get(cacheKey);
+      if (isRedisConnected() && redis) {
+        const cacheKey = `sold:${normalizedPhone}`;
+        const cached = await redis.get(cacheKey);
 
-      if (cached !== null) {
-        return res.json({
-          phone: normalizedPhone,
-          sold: cached === 'yes',
-          source: 'cache',
-        });
+        if (cached !== null) {
+          return res.json({
+            phone: normalizedPhone,
+            sold: cached === 'yes',
+            source: 'cache',
+          });
+        }
       }
 
       // Cache miss - query database
@@ -73,9 +75,13 @@ router.get(
         .eq('customer_phone', normalizedPhone)
         .eq('disposition_id', saleDisposition.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      const isSold = !error && outcome !== null;
+      if (error) {
+        throw error;
+      }
+
+      const isSold = outcome !== null;
 
       // Write to Redis cache (24h TTL)
       await markNumberSold(normalizedPhone, isSold);

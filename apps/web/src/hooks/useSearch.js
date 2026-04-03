@@ -40,6 +40,29 @@ export function useSearch() {
     searchNumber(cleaned);
   };
 
+  const submitSearch = async () => {
+    if (!query || query.replace(/\D/g, '').length < 10) {
+      setError('Please enter at least 10 digits');
+      setResult(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.get('/search/number', {
+        params: { q: query },
+        timeout: 10000,
+      });
+      setResult(response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Search failed');
+      setResult(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearSearch = () => {
     setQuery('');
     setResult(null);
@@ -53,5 +76,6 @@ export function useSearch() {
     error,
     handleQueryChange,
     clearSearch,
+    submitSearch,
   };
 }

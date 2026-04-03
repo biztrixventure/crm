@@ -10,31 +10,44 @@ import CallbacksManager from '../components/CallbacksManager';
 
 // Number Search component
 function NumberSearch() {
-  const { query, result, isLoading, error, handleQueryChange, clearSearch } = useSearch();
+  const { query, result, isLoading, error, handleQueryChange, clearSearch, submitSearch } = useSearch();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+    <div className="bg-white dark:bg-dark-900 rounded-2xl p-6 shadow-lg border border-cream-200/50 dark:border-dark-800/60">
+      <h2 className="text-lg font-semibold text-primary-800 dark:text-primary-200 mb-4">
         Number Search
       </h2>
       
       <div className="relative">
-        <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
         <input
           type="text"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submitSearch();
+            }
+          }}
           placeholder="Enter phone number..."
-          className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="w-full pl-10 pr-24 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
         />
+        <button
+          type="button"
+          onClick={submitSearch}
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold transition-colors"
+        >
+          Search
+        </button>
         {isLoading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+          <Loader2 className="absolute right-20 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 animate-spin" />
         )}
       </div>
 
       {error && (
-        <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
 
       {result && (
         <div className={cn(
@@ -57,12 +70,15 @@ function NumberSearch() {
             )}>
               {result.sold ? 'SOLD' : 'NOT SOLD'}
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {result.phone}
-            </p>
+              <p className="text-sm text-primary-500 dark:text-primary-400">
+                {result.phone}
+              </p>
+              <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
+                Source: {result.source === 'cache' ? 'Redis cache' : 'Database'}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {(query || result || error) && (
         <button

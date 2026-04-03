@@ -12,8 +12,10 @@ export const assignNumbersSchema = z.object({
 
 export const searchNumberSchema = z.object({
   q: z.string()
-    .min(10, 'Phone number must be at least 10 digits')
-    .transform(val => val.replace(/\D/g, '')), // Strip non-digits
+    .transform((val) => val.replace(/\D/g, '')) // Strip non-digits
+    .refine((digits) => digits.length >= 10, {
+      message: 'Phone number must be at least 10 digits',
+    }),
 });
 
 export default {
