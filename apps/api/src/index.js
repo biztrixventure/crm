@@ -44,6 +44,9 @@ import auditRoutes from './routes/audit.js';
 const app = express();
 const httpServer = createServer(app);
 
+// Trust proxy - required for rate limiting behind reverse proxy (Coolify/Traefik)
+app.set('trust proxy', 1);
+
 // Initialize Socket.io
 initSocket(httpServer);
 

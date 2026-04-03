@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
         is_active,
         totp_enabled,
         created_at,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name
@@ -115,7 +115,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
         company_id,
         is_active,
         created_at,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name
@@ -158,7 +158,7 @@ router.get('/:id', async (req, res) => {
         is_active,
         totp_enabled,
         created_at,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name,
@@ -244,7 +244,7 @@ router.patch('/:id', validate(updateUserSchema), async (req, res) => {
         is_active,
         totp_enabled,
         created_at,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name

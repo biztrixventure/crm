@@ -57,7 +57,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
         totp_enabled,
         totp_secret,
         is_active,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name,

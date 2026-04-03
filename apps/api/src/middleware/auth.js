@@ -42,7 +42,7 @@ export async function authenticate(req, res, next) {
         company_id,
         totp_enabled,
         is_active,
-        companies (
+        companies!users_company_id_fkey (
           id,
           name,
           display_name,
