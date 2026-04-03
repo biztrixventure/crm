@@ -12,21 +12,8 @@ export function initSocket(httpServer) {
     transports: ['websocket', 'polling'],
   });
 
-  // Setup Redis adapter for horizontal scaling (optional)
-  if (isRedisConnected()) {
-    try {
-      const { createAdapter } = await import('@socket.io/redis-adapter');
-      const redis = getRedis();
-      const pubClient = redis.duplicate();
-      const subClient = redis.duplicate();
-      io.adapter(createAdapter(pubClient, subClient));
-      console.log('✅ Socket.io Redis adapter initialized');
-    } catch (err) {
-      console.warn('Socket.io running without Redis adapter:', err.message);
-    }
-  } else {
-    console.log('🔄 Socket.io running without Redis adapter (Redis not connected)');
-  }
+  // Redis adapter setup deferred - works without it for single instance
+  console.log('✅ Socket.io initialized (single instance mode)');
 
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
@@ -48,7 +35,6 @@ export function initSocket(httpServer) {
     });
   });
 
-  console.log('✅ Socket.io initialized');
   return io;
 }
 
