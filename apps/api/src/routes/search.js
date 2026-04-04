@@ -114,78 +114,84 @@ router.get(
       let vicidialAvailable = false;
       
       if (vicidial.isConfigured()) {
-        vicidialAvailable = true;
-        
-        // Check Redis cache for ViciDial log
-        let vdLogData = null;
-        if (isRedisConnected() && redis) {
-          const vdCacheKey = `vdlog:${normalizedPhone}`;
-          const vdCached = await redis.get(vdCacheKey);
-          if (vdCached) {
-            vdLogData = JSON.parse(vdCached);
-          }
-        }
-
-        // Fetch from ViciDial if not cached
-        if (!vdLogData) {
-          const calls = await vicidial.getPhoneNumberLog(phoneDigits);
-          vdLogData = calls || [];
+        try {
+          vicidialAvailable = true;
           
-          // Cache ViciDial log (1h TTL)
-          if (isRedisConnected() && redis && vdLogData.length > 0) {
+          // Check Redis cache for ViciDial log
+          let vdLogData = null;
+          if (isRedisConnected() && redis) {
             const vdCacheKey = `vdlog:${normalizedPhone}`;
-            await redis.setex(vdCacheKey, 3600, JSON.stringify(vdLogData));
-          }
-        }
-
-        // Step 4: Resolve agent names for ViciDial calls
-        for (const call of vdLogData) {
-          let agentName = null;
-          let agentSource = null;
-
-          // Try to match with CRM record by vicidial_lead_id
-          if (call.list_id) {
-            const crmMatch = crmRecords?.find(
-              r => r.vicidial_lead_id === call.list_id &&
-                   Math.abs(new Date(r.created_at) - new Date(call.call_datetime)) < 1800000 // 30 min window
-            );
-            if (crmMatch && crmMatch.closer?.full_name) {
-              agentName = crmMatch.closer.full_name;
-              agentSource = 'crm_match';
+            const vdCached = await redis.get(vdCacheKey);
+            if (vdCached) {
+              vdLogData = JSON.parse(vdCached);
             }
           }
 
-          // Fallback: Check agent cache in Redis
-          if (!agentName && isRedisConnected() && redis && call.campaign_id) {
-            const agentCacheKey = `agent_cache:${call.campaign_id}`;
-            const cached = await redis.get(agentCacheKey);
-            if (cached) {
-              agentName = cached;
-              agentSource = 'cache';
+          // Fetch from ViciDial if not cached
+          if (!vdLogData) {
+            const calls = await vicidial.getPhoneNumberLog(phoneDigits);
+            vdLogData = calls || [];
+            
+            // Cache ViciDial log (1h TTL)
+            if (isRedisConnected() && redis && vdLogData.length > 0) {
+              const vdCacheKey = `vdlog:${normalizedPhone}`;
+              await redis.setex(vdCacheKey, 3600, JSON.stringify(vdLogData));
             }
           }
 
-          // Fallback: Show list_id
-          if (!agentName) {
-            agentName = call.list_id ? `Agent ID: ${call.list_id}` : 'Unknown Agent';
-            agentSource = 'fallback';
+          // Step 4: Resolve agent names for ViciDial calls
+          for (const call of vdLogData) {
+            let agentName = null;
+            let agentSource = null;
+
+            // Try to match with CRM record by vicidial_lead_id
+            if (call.list_id) {
+              const crmMatch = crmRecords?.find(
+                r => r.vicidial_lead_id === call.list_id &&
+                     Math.abs(new Date(r.created_at) - new Date(call.call_datetime)) < 1800000 // 30 min window
+              );
+              if (crmMatch && crmMatch.closer?.full_name) {
+                agentName = crmMatch.closer.full_name;
+                agentSource = 'crm_match';
+              }
+            }
+
+            // Fallback: Check agent cache in Redis
+            if (!agentName && isRedisConnected() && redis && call.campaign_id) {
+              const agentCacheKey = `agent_cache:${call.campaign_id}`;
+              const cached = await redis.get(agentCacheKey);
+              if (cached) {
+                agentName = cached;
+                agentSource = 'cache';
+              }
+            }
+
+            // Fallback: Show list_id
+            if (!agentName) {
+              agentName = call.list_id ? `Agent ID: ${call.list_id}` : 'Unknown Agent';
+              agentSource = 'fallback';
+            }
+
+            call.agent_name = agentName;
+            call.agent_source = agentSource;
           }
 
-          call.agent_name = agentName;
-          call.agent_source = agentSource;
-        }
+          vicidialCalls = vdLogData;
 
-        vicidialCalls = vdLogData;
-
-        // Optionally fetch and cache logged-in agents for future calls
-        if (crmRecords?.length > 0 && isRedisConnected() && redis) {
-          const campaignId = vicidialCalls[0]?.campaign_id;
-          if (campaignId) {
-            const agents = await vicidial.getLoggedInAgents(campaignId);
-            for (const [userId, agentName] of Object.entries(agents)) {
-              await redis.setex(`agent_cache:${userId}`, 60, agentName);
+          // Optionally fetch and cache logged-in agents for future calls
+          if (crmRecords?.length > 0 && isRedisConnected() && redis) {
+            const campaignId = vicidialCalls[0]?.campaign_id;
+            if (campaignId) {
+              const agents = await vicidial.getLoggedInAgents(campaignId);
+              for (const [userId, agentName] of Object.entries(agents)) {
+                await redis.setex(`agent_cache:${userId}`, 60, agentName);
+              }
             }
           }
+        } catch (vdErr) {
+          console.error('ViciDial fetch error (non-fatal):', vdErr.message);
+          vicidialAvailable = false;
+          vicidialCalls = [];
         }
       }
 
@@ -261,7 +267,15 @@ router.get(
       });
     } catch (err) {
       console.error('Number search error:', err);
-      res.status(500).json({ error: 'Search failed' });
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        code: err.code,
+      });
+      res.status(500).json({ 
+        error: 'Search failed',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      });
     }
   }
 );
