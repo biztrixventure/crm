@@ -2,7 +2,7 @@ import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
-import { validateRequest } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.js';
 import z from 'zod';
 
 const router = Router();
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /clients - Create client (Super Admin only)
-router.post('/', roleGuard('super_admin'), validateRequest(clientSchema), async (req, res) => {
+router.post('/', roleGuard('super_admin'), validate(clientSchema), async (req, res) => {
   const { name } = req.body;
 
   try {

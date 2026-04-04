@@ -183,20 +183,37 @@ router.get('/me/profile', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get user stats
+    // Get user stats - use limit approach instead of count
     const stats = {};
     
     if (user.role === 'fronter') {
+      const { data: transfers, error: transferError } = await supabase
+        .from('transfers')
+        .select('id')
+        .eq('fronter_id', id)
+        .limit(1)
+        .offset(0);
+      
+      // Use a single count query
       const { count: transferCount } = await supabase
         .from('transfers')
         .select('id', { count: 'exact', head: true })
         .eq('fronter_id', id);
       stats.totalTransfers = transferCount || 0;
     } else if (user.role === 'closer') {
-      const [{ count: outcomeCount }, { count: saleCount }] = await Promise.all([
-        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id),
-        supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('closer_id', id).not('revenue', 'is', null),
-      ]);
+      // Single query to get outcome count
+      const { count: outcomeCount } = await supabase
+        .from('outcomes')
+        .select('id', { count: 'exact', head: true })
+        .eq('closer_id', id);
+      
+      // Single query for sales (outcomes with revenue)
+      const { count: saleCount } = await supabase
+        .from('outcomes')
+        .select('id', { count: 'exact', head: true })
+        .eq('closer_id', id)
+        .not('revenue', 'is', null);
+      
       stats.totalOutcomes = outcomeCount || 0;
       stats.totalSales = saleCount || 0;
     }

@@ -847,6 +847,881 @@ Filled by the closer after every call where they spoke to the customer and compl
 - Show loading state on submit. Disable button to prevent double submission.
 
 ---
+# BizTrixVenture CRM — ViciDial Integration
+## PRD Section + Ready-to-Use Service File
+
+> **Server:** `tmcsolinb.i5.tel`
+> **API Path:** `/vicidial/non_agent_api.php`
+> **Confirmed working functions:** `lead_search`, `phone_number_log`, `logged_in_agents`
+> **Auth:** `user=apiuser&pass=apiuser123`
+
+---
+
+## Part 1 — PRD: ViciDial Integration (Phase 8)
+
+### 1.1 What ViciDial Provides vs What CRM Provides
+
+| Data Point | Source | How |
+|---|---|---|
+| Phone → lead_id | ViciDial `lead_search` | Returns `phone\|count\|lead_id` |
+| Call dates, durations, disposition codes | ViciDial `phone_number_log` | Returns one row per call |
+| Live agent names + statuses | ViciDial `logged_in_agents` | Cached in Redis 60s |
+| Historical agent name | CRM `closer_records` | Matched by lead_id or phone + date within 30 min |
+| Customer name, address, email, DOB, vehicle | CRM `closer_records` + `transfers` | Filled by closer and fronter manually |
+
+**Key design decision:** ViciDial's `lead_search` on this server ignores `query_fields` and only returns `phone|count|lead_id`. All customer data comes from the CRM. ViciDial only provides call history (dates, durations, dispositions).
+
+---
+
+### 1.2 Confirmed API Responses
+
+**`lead_search` — find lead_id by phone:**
+```
+Request:  ?function=lead_search&phone_number=9148062683
+Response: 9148062683|1|52457
+Format:   phone_number | count | lead_id
+```
+
+**`phone_number_log` — full call history for a phone:**
+```
+Request:  ?function=phone_number_log&phone_number=9148062683
+Response: 9148062683|2026-04-03 16:57:27|101010|1974|SALE|CALLER|SALE||1011
+          9148062683|2026-04-03 16:55:11|101010|22|SALE|CALLER|A||1011
+          9148062683|2026-04-03 16:54:31|101010|33|SALE|CALLER|A||1011
+          9148062683|2026-04-03 16:53:51|101010|33|SALE|CALLER|A||1011
+
+Format (pipe-separated, one row per call):
+  [0] phone_number      — 9148062683
+  [1] call_datetime     — 2026-04-03 16:57:27
+  [2] list_id           — 101010
+  [3] duration_seconds  — 1974
+  [4] disposition_code  — SALE
+  [5] call_type         — CALLER
+  [6] status            — SALE (or A for attempt)
+  [7] extra             — (empty)
+  [8] campaign_id       — 1011
+```
+
+**`logged_in_agents` — live agents with names:**
+```
+Request:  ?function=logged_in_agents&campaign_id=IHP_01
+Response: 1005|IHP_01|8600051|PAUSED|52731||33|Simon Vargas|tmcsolinb|1
+          1024|IHP_01|8600058|INCALL|40171|M403...|60|Mark Oliver|tmcsolinb|1
+
+Format (pipe-separated, one row per agent):
+  [0] user_id        — 1005
+  [1] campaign_id    — IHP_01
+  [2] phone_ext      — 8600051
+  [3] agent_status   — PAUSED | INCALL | READY | DISPO
+  [4] lead_id        — 52731
+  [5] call_id        — (empty or call id)
+  [6] duration_sec   — 33
+  [7] agent_name     — Simon Vargas
+  [8] server         — tmcsolinb
+  [9] flag           — 1
+```
+
+---
+
+### 1.3 Search Flow (Step by Step)
+
+```
+Closer types phone number in search bar
+              │
+              ▼
+1. normalizePhone(input)
+   → e164:  +19148062683   (Redis key)
+   → ten:   9148062683     (ViciDial param)
+              │
+              ▼
+2. Redis GET sold:{e164}
+   ├── HIT  → skip to step 6 (use cached result)
+   └── MISS → continue
+              │
+              ▼
+3. Supabase query (parallel):
+   - closer_records WHERE customer_phone = e164 (ALL companies, ALL closers)
+   - transfers WHERE customer_phone = e164 (ALL companies)
+              │
+              ▼
+4. Redis GET vdlog:{e164}
+   ├── HIT  → use cached ViciDial rows
+   └── MISS → call ViciDial:
+              │
+              ▼
+5. ViciDial call 1 — lead_search:
+   GET phone_number_log?phone_number=9148062683
+   → parse all rows
+   → filter: keep only rows where duration_seconds > 60
+              (removes short dial attempts, keeps real conversations)
+   → write to Redis: SET vdlog:{e164} JSON EX 3600
+              │
+              ▼
+6. Agent name resolution per call row:
+   For each filtered ViciDial row:
+     a. Try match: closer_records WHERE vicidial_lead_id = row.lead_id
+                   AND ABS(created_at - row.call_datetime) < 1800 seconds
+        → if match found: use closer_records.closer.full_name
+     b. No match: check Redis agent_cache:{list_id}
+        → if found: use cached name
+     c. No cache: show "Agent ID: {list_id}"
+              │
+              ▼
+7. Build agent cache from logged_in_agents
+   (called once per search session, cached Redis 60s):
+   GET logged_in_agents&campaign_id=IHP_01
+   → parse user_id → agent_name pairs
+   → SET agent_cache:{user_id} name EX 60 for each
+              │
+              ▼
+8. Merge into unified timeline:
+   - Combine CRM records + filtered ViciDial rows
+   - Sort by timestamp DESC (newest first)
+   - Tag each entry: type = "crm_record" | "vicidial_call"
+              │
+              ▼
+9. Apply field visibility filter:
+   - Load search_field_config for requester's role
+   - Strip hidden fields from CRM records
+   - ViciDial rows always show: date, duration, disposition_code, agent_name
+              │
+              ▼
+10. Write sold status to Redis:
+    If any CRM closer_record has status = SOLD:
+      SET sold:{e164} "yes" EX 86400
+    Else:
+      SET sold:{e164} "no" EX 86400
+              │
+              ▼
+11. Return unified response to frontend
+```
+
+---
+
+### 1.4 Duration Filter Logic
+
+From confirmed ViciDial data on `tmcsolinb.i5.tel`:
+
+| Duration | What it means | Keep? |
+|---|---|---|
+| > 60 seconds | Real conversation — closer spoke to customer | ✅ Yes |
+| ≤ 60 seconds | Dial attempt — rang or connected briefly | ❌ No |
+
+This is configurable via env var `VICIDIAL_MIN_CALL_DURATION=60` so it can be adjusted without a code change.
+
+---
+
+### 1.5 Redis Keys for ViciDial
+
+| Key | Type | TTL | Content |
+|---|---|---|---|
+| `sold:{e164}` | STRING | 24h | `"yes"` or `"no"` |
+| `vdlog:{e164}` | STRING | 1h | JSON array of filtered call rows |
+| `agent_cache:{user_id}` | STRING | 60s | Agent full name string |
+
+---
+
+### 1.6 Unified Search Response Shape
+
+```json
+{
+  "phone": "+19148062683",
+  "sold": true,
+  "total_policies": 1,
+  "vicidial_available": true,
+  "crm_records": [
+    {
+      "id": "uuid",
+      "policy_number": 1,
+      "previous_record_id": null,
+      "record_date": "2026-04-03",
+      "status": "SOLD",
+      "customer_name": "FRANK JENKINS",
+      "customer_phone": "(904) 765-0112",
+      "customer_email": "FRANK.JENKINSJr.49@gmail.com",
+      "customer_address": "230 E 1st St #813 Jacksonville, FL 32206",
+      "customer_dob": null,
+      "customer_gender": null,
+      "car_make": "TOYOTA",
+      "car_model": "CAMRY",
+      "car_year": "2018",
+      "car_miles": "152,225",
+      "car_vin": "4T1B11HK5JU153898",
+      "plan": "Signature",
+      "client": "Jim",
+      "down_payment": 108.00,
+      "monthly_payment": 108.00,
+      "reference_no": "MBH4220SBN",
+      "next_payment_note": "Monthly payments will be on 3rd of May",
+      "closer_name": "Haroon Yousaf",
+      "fronter_name": "Mohsin Tariq Illahi",
+      "company_name": "Company A",
+      "disposition_code": "SALE",
+      "remarks": ""
+    }
+  ],
+  "vicidial_calls": [
+    {
+      "phone_number": "9148062683",
+      "call_datetime": "2026-04-03 16:57:27",
+      "list_id": "101010",
+      "duration_seconds": 1974,
+      "duration_display": "32m 54s",
+      "disposition_code": "SALE",
+      "call_type": "CALLER",
+      "campaign_id": "1011",
+      "agent_name": "Haroon Yousaf",
+      "agent_source": "crm_match"
+    }
+  ],
+  "merged_timeline": [
+    {
+      "timestamp": "2026-04-03 16:57:27",
+      "type": "vicidial_call",
+      "disposition_code": "SALE",
+      "duration_display": "32m 54s",
+      "agent_name": "Haroon Yousaf",
+      "summary": "SALE — 32m 54s — Haroon Yousaf"
+    },
+    {
+      "timestamp": "2026-04-03T15:00:00Z",
+      "type": "crm_record",
+      "record_id": "uuid",
+      "policy_number": 1,
+      "summary": "Policy 1 — 2018 TOYOTA CAMRY — Signature — Jim"
+    }
+  ]
+}
+```
+
+---
+
+### 1.7 Frontend Search UI Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  🔍  Search phone number...              [Search]    │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  +1 (914) 806-2683                                   │
+│  ● SOLD   2 calls found   1 policy                   │
+│                          [+ Create New Policy]       │
+└─────────────────────────────────────────────────────┘
+
+┌──────────────────────┐  ┌──────────────────────────┐
+│   CRM RECORDS        │  │   VICIDIAL TIMELINE       │
+│                      │  │                           │
+│  Policy 1            │  │  2026-04-03 16:57:27      │
+│  2018 TOYOTA CAMRY   │  │  SALE — 32m 54s           │
+│  Signature — Jim     │  │  Haroon Yousaf            │
+│  Haroon Yousaf       │  │  ─────────────────────    │
+│  04/03/2026          │  │  (short attempts hidden)  │
+│  [▼ expand]          │  │                           │
+└──────────────────────┘  └──────────────────────────┘
+```
+
+**Expanded CRM record card shows all fields allowed by `search_field_config`. Any null field shows "Not available" in muted gray — never hidden.**
+
+---
+
+## Part 2 — `vicidial.js` Service File
+
+Save this at: `apps/api/src/services/vicidial.js`
+
+```javascript
+/**
+ * vicidial.js
+ * BizTrixVenture CRM — ViciDial Integration Service
+ * Server: tmcsolinb.i5.tel
+ * Confirmed working functions: lead_search, phone_number_log, logged_in_agents
+ */
+
+const axios = require('axios');
+const redis = require('./redis'); // your existing redis client
+
+// ─── Config ────────────────────────────────────────────────────────────────
+
+const VD_BASE        = process.env.VICIDIAL_URL;        // https://tmcsolinb.i5.tel
+const VD_PATH        = process.env.VICIDIAL_API_PATH;   // /vicidial/non_agent_api.php
+const VD_USER        = process.env.VICIDIAL_API_USER;   // apiuser
+const VD_PASS        = process.env.VICIDIAL_API_PASS;   // apiuser123
+const VD_CAMPAIGN    = process.env.VICIDIAL_CAMPAIGN;   // IHP_01
+const MIN_DURATION   = parseInt(process.env.VICIDIAL_MIN_CALL_DURATION || '60'); // seconds
+
+// Disposition codes that mean the closer actually spoke to the customer.
+// Calls with these codes AND duration > MIN_DURATION are shown in timeline.
+// Short attempts (duration <= MIN_DURATION) are always filtered regardless of dispo.
+const REAL_CALL_DISPOS = ['SALE', 'NI', 'NA', 'CB', 'DNC', 'WN', 'A'];
+
+// ─── Phone Normalization ───────────────────────────────────────────────────
+
+/**
+ * Normalize any phone input to E.164 and 10-digit formats.
+ * E.164 (+1XXXXXXXXXX) is used for Redis keys.
+ * 10-digit (XXXXXXXXXX) is used for ViciDial API params.
+ *
+ * Examples:
+ *   "(904) 765-0112"  → { e164: "+19047650112", ten: "9047650112" }
+ *   "1-914-806-2683"  → { e164: "+19148062683", ten: "9148062683" }
+ *   "+19148062683"    → { e164: "+19148062683", ten: "9148062683" }
+ */
+function normalizePhone(raw) {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D/g, '');
+  // Remove leading country code 1 if 11 digits
+  const ten = digits.length === 11 && digits[0] === '1'
+    ? digits.slice(1)
+    : digits;
+  if (ten.length !== 10) return null; // invalid US number
+  return {
+    e164: `+1${ten}`,
+    ten
+  };
+}
+
+// ─── Duration Formatter ────────────────────────────────────────────────────
+
+function formatDuration(seconds) {
+  const s = parseInt(seconds) || 0;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m === 0) return `${rem}s`;
+  return `${m}m ${rem}s`;
+}
+
+// ─── ViciDial HTTP Call ────────────────────────────────────────────────────
+
+/**
+ * Make a GET request to the ViciDial non_agent_api.php endpoint.
+ * Returns the raw text response (ViciDial returns plain text, not JSON).
+ * Throws on HTTP error or timeout.
+ */
+async function vdCall(params) {
+  const url = `${VD_BASE}${VD_PATH}`;
+  const fullParams = {
+    source: 'test',
+    user: VD_USER,
+    pass: VD_PASS,
+    ...params
+  };
+  const qs = new URLSearchParams(fullParams).toString();
+  const response = await axios.get(`${url}?${qs}`, {
+    timeout: 8000, // 8 second timeout — never block search for too long
+    headers: { 'User-Agent': 'BizTrixVentureCRM/2.0' }
+  });
+  return response.data;
+}
+
+// ─── lead_search — Get lead_id from phone number ───────────────────────────
+
+/**
+ * Given a 10-digit phone number, returns the ViciDial lead_id.
+ * Response format: "9148062683|1|52457"
+ * Returns lead_id string or null if not found.
+ */
+async function getLeadId(tenDigitPhone) {
+  try {
+    const raw = await vdCall({
+      function: 'lead_search',
+      phone_number: tenDigitPhone
+    });
+
+    // Response: "phone|count|lead_id" or "ERROR:..."
+    if (!raw || raw.startsWith('ERROR')) return null;
+
+    const parts = raw.trim().split('|');
+    // parts[0] = phone, parts[1] = count, parts[2] = lead_id
+    if (parts.length >= 3 && parts[2]) {
+      return parts[2].trim();
+    }
+    return null;
+  } catch (err) {
+    console.error('[ViciDial] lead_search error:', err.message);
+    return null;
+  }
+}
+
+// ─── phone_number_log — Get call history ──────────────────────────────────
+
+/**
+ * Parse a single pipe-separated row from phone_number_log response.
+ * Format: phone|datetime|list_id|duration|dispo_code|call_type|status|extra|campaign
+ *
+ * Example row:
+ * "9148062683|2026-04-03 16:57:27|101010|1974|SALE|CALLER|SALE||1011"
+ */
+function parseCallLogRow(row) {
+  const parts = row.split('|');
+  if (parts.length < 5) return null;
+  return {
+    phone_number:      parts[0]?.trim() || '',
+    call_datetime:     parts[1]?.trim() || '',
+    list_id:           parts[2]?.trim() || '',
+    duration_seconds:  parseInt(parts[3]) || 0,
+    disposition_code:  parts[4]?.trim() || '',
+    call_type:         parts[5]?.trim() || '',
+    status:            parts[6]?.trim() || '',
+    campaign_id:       parts[8]?.trim() || '',
+  };
+}
+
+/**
+ * Fetch full call log for a phone number from ViciDial.
+ * Returns only calls where closer actually spoke to customer:
+ *   - duration > MIN_DURATION seconds (default 60)
+ * Filtered rows include duration display string and are sorted newest first.
+ *
+ * Caches result in Redis for 1 hour.
+ */
+async function getCallLog(tenDigitPhone, e164Phone) {
+  const cacheKey = `vdlog:${e164Phone}`;
+
+  // Check Redis cache first
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (_) {}
+
+  try {
+    const raw = await vdCall({
+      function: 'phone_number_log',
+      phone_number: tenDigitPhone
+    });
+
+    if (!raw || raw.startsWith('ERROR')) return [];
+
+    const rows = raw.trim().split('\n').filter(Boolean);
+    const parsed = rows
+      .map(parseCallLogRow)
+      .filter(Boolean)
+      // Only keep calls where closer actually spoke to customer
+      .filter(row => row.duration_seconds > MIN_DURATION)
+      // Add display-friendly duration
+      .map(row => ({
+        ...row,
+        duration_display: formatDuration(row.duration_seconds),
+        agent_name: null,        // resolved later via resolveAgentNames()
+        agent_source: 'unknown'
+      }))
+      // Sort newest first
+      .sort((a, b) => new Date(b.call_datetime) - new Date(a.call_datetime));
+
+    // Cache for 1 hour
+    try {
+      await redis.set(cacheKey, JSON.stringify(parsed), 'EX', 3600);
+    } catch (_) {}
+
+    return parsed;
+  } catch (err) {
+    console.error('[ViciDial] phone_number_log error:', err.message);
+    return [];
+  }
+}
+
+// ─── logged_in_agents — Live agent name cache ──────────────────────────────
+
+/**
+ * Parse a single pipe-separated row from logged_in_agents response.
+ * Format: user_id|campaign|phone_ext|status|lead_id|call_id|duration|agent_name|server|flag
+ *
+ * Example:
+ * "1005|IHP_01|8600051|PAUSED|52731||33|Simon Vargas|tmcsolinb|1"
+ */
+function parseAgentRow(row) {
+  const parts = row.split('|');
+  if (parts.length < 8) return null;
+  return {
+    user_id:      parts[0]?.trim() || '',
+    campaign_id:  parts[1]?.trim() || '',
+    status:       parts[3]?.trim() || '',  // PAUSED | INCALL | READY | DISPO
+    lead_id:      parts[4]?.trim() || '',
+    duration_sec: parseInt(parts[6]) || 0,
+    agent_name:   parts[7]?.trim() || '',
+    server:       parts[8]?.trim() || '',
+  };
+}
+
+/**
+ * Fetch live agents from ViciDial and build a user_id → name map.
+ * Cached in Redis for 60 seconds (live data, refreshes frequently).
+ * Returns object: { "1005": "Simon Vargas", "1024": "Mark Oliver" }
+ */
+async function getLiveAgentMap() {
+  const cacheKey = 'vd:agent_map';
+
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (_) {}
+
+  try {
+    const raw = await vdCall({
+      function: 'logged_in_agents',
+      campaign_id: VD_CAMPAIGN
+    });
+
+    if (!raw || raw.startsWith('ERROR')) return {};
+
+    const agentMap = {};
+    const rows = raw.trim().split('\n').filter(Boolean);
+    rows.forEach(row => {
+      const agent = parseAgentRow(row);
+      if (agent && agent.user_id && agent.agent_name) {
+        agentMap[agent.user_id] = agent.agent_name;
+      }
+    });
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(agentMap), 'EX', 60);
+    } catch (_) {}
+
+    return agentMap;
+  } catch (err) {
+    console.error('[ViciDial] logged_in_agents error:', err.message);
+    return {};
+  }
+}
+
+// ─── Agent Name Resolution ─────────────────────────────────────────────────
+
+/**
+ * Resolve agent names for each ViciDial call row.
+ * Strategy (in priority order):
+ *
+ * 1. Match to CRM closer_record:
+ *      closer_records WHERE vicidial_lead_id = row.lead_id
+ *      AND ABS(created_at - call_datetime) < 1800 seconds (30 min window)
+ *      → use closer's full_name from DB
+ *      → agent_source: "crm_match"
+ *
+ * 2. Match to live agent map (logged_in_agents):
+ *      agentMap[row.list_id]
+ *      → use agent_name from ViciDial live data
+ *      → agent_source: "vicidial_live"
+ *
+ * 3. Fallback:
+ *      Show "Agent: {list_id}"
+ *      → agent_source: "id_only"
+ *
+ * @param {Array}  callRows    - filtered rows from getCallLog()
+ * @param {Array}  crmRecords  - closer_records from Supabase for this phone
+ * @param {Object} agentMap    - { user_id: name } from getLiveAgentMap()
+ * @returns {Array} callRows with agent_name and agent_source filled in
+ */
+function resolveAgentNames(callRows, crmRecords, agentMap) {
+  return callRows.map(row => {
+    // Strategy 1: match to CRM closer record
+    const THIRTY_MINUTES = 30 * 60 * 1000; // ms
+    const callTime = new Date(row.call_datetime).getTime();
+
+    const crmMatch = crmRecords.find(rec => {
+      const recTime = new Date(rec.created_at).getTime();
+      const sameLeadId = rec.vicidial_lead_id && rec.vicidial_lead_id === row.list_id;
+      const withinWindow = Math.abs(recTime - callTime) < THIRTY_MINUTES;
+      return sameLeadId || withinWindow;
+    });
+
+    if (crmMatch && crmMatch.closer_name) {
+      return { ...row, agent_name: crmMatch.closer_name, agent_source: 'crm_match' };
+    }
+
+    // Strategy 2: live agent map by list_id
+    if (agentMap[row.list_id]) {
+      return { ...row, agent_name: agentMap[row.list_id], agent_source: 'vicidial_live' };
+    }
+
+    // Strategy 3: fallback to ID
+    return { ...row, agent_name: `Agent: ${row.list_id}`, agent_source: 'id_only' };
+  });
+}
+
+// ─── Timeline Merger ───────────────────────────────────────────────────────
+
+/**
+ * Merge CRM records and ViciDial call rows into a single timeline.
+ * Each entry has a type: "crm_record" | "vicidial_call"
+ * Sorted newest first by timestamp.
+ */
+function buildMergedTimeline(crmRecords, vicidialCalls) {
+  const timeline = [];
+
+  crmRecords.forEach(rec => {
+    timeline.push({
+      timestamp:        rec.created_at,
+      type:             'crm_record',
+      record_id:        rec.id,
+      policy_number:    rec.policy_number,
+      status:           rec.status,
+      car_make:         rec.car_make,
+      car_model:        rec.car_model,
+      car_year:         rec.car_year,
+      plan:             rec.plan_name,
+      client:           rec.client_name,
+      closer_name:      rec.closer_name,
+      summary: `Policy ${rec.policy_number} — ${rec.car_year || ''} ${rec.car_make || ''} ${rec.car_model || ''} — ${rec.plan_name || ''} — ${rec.client_name || ''}`
+    });
+  });
+
+  vicidialCalls.forEach(call => {
+    timeline.push({
+      timestamp:        call.call_datetime,
+      type:             'vicidial_call',
+      disposition_code: call.disposition_code,
+      duration_seconds: call.duration_seconds,
+      duration_display: call.duration_display,
+      agent_name:       call.agent_name,
+      agent_source:     call.agent_source,
+      campaign_id:      call.campaign_id,
+      summary: `${call.disposition_code} — ${call.duration_display} — ${call.agent_name}`
+    });
+  });
+
+  // Sort newest first
+  return timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+// ─── Main Search Function ──────────────────────────────────────────────────
+
+/**
+ * Full unified number search.
+ * Called by the search API route: GET /api/v1/search/number?q={phone}
+ *
+ * @param {string} rawPhone   - raw phone input from user
+ * @param {Array}  crmRecords - closer_records + transfers from Supabase (passed in from route)
+ * @returns {Object} unified search result
+ */
+async function searchNumber(rawPhone, crmRecords = []) {
+  // 1. Normalize
+  const phone = normalizePhone(rawPhone);
+  if (!phone) {
+    return { error: 'Invalid phone number', phone: rawPhone };
+  }
+
+  let vicidialAvailable = true;
+  let vicidialCalls = [];
+  let leadId = null;
+
+  try {
+    // 2. Check Redis sold cache
+    let soldStatus = null;
+    try {
+      soldStatus = await redis.get(`sold:${phone.e164}`);
+    } catch (_) {}
+
+    // 3. Fetch ViciDial call log (uses Redis cache internally)
+    vicidialCalls = await getCallLog(phone.ten, phone.e164);
+
+    // 4. Get lead_id (for reference — stored on closer record if found)
+    leadId = await getLeadId(phone.ten);
+
+    // 5. Get live agent map for name resolution
+    const agentMap = await getLiveAgentMap();
+
+    // 6. Resolve agent names for each ViciDial call
+    vicidialCalls = resolveAgentNames(vicidialCalls, crmRecords, agentMap);
+
+  } catch (err) {
+    console.error('[ViciDial] searchNumber error:', err.message);
+    vicidialAvailable = false;
+    // Do NOT throw — degrade gracefully, return CRM data only
+  }
+
+  // 7. Determine sold status from CRM records
+  const isSold = crmRecords.some(r => r.status === 'SOLD');
+  const totalPolicies = crmRecords.filter(r => r.status === 'SOLD').length;
+
+  // 8. Update Redis sold cache
+  try {
+    await redis.set(
+      `sold:${phone.e164}`,
+      isSold ? 'yes' : 'no',
+      'EX',
+      86400 // 24 hours
+    );
+  } catch (_) {}
+
+  // 9. Build merged timeline
+  const mergedTimeline = buildMergedTimeline(crmRecords, vicidialCalls);
+
+  // 10. Return unified result
+  return {
+    phone:              phone.e164,
+    phone_display:      `(${phone.ten.slice(0,3)}) ${phone.ten.slice(3,6)}-${phone.ten.slice(6)}`,
+    sold:               isSold,
+    total_policies:     totalPolicies,
+    lead_id:            leadId,
+    vicidial_available: vicidialAvailable,
+    crm_records:        crmRecords,
+    vicidial_calls:     vicidialCalls,
+    merged_timeline:    mergedTimeline
+  };
+}
+
+// ─── Exports ───────────────────────────────────────────────────────────────
+
+module.exports = {
+  searchNumber,
+  normalizePhone,
+  getLeadId,
+  getCallLog,
+  getLiveAgentMap,
+  resolveAgentNames,
+  buildMergedTimeline,
+  formatDuration
+};
+```
+
+---
+
+## Part 3 — Search Route
+
+Save at: `apps/api/src/routes/search.js`
+
+```javascript
+/**
+ * search.js — Number search route
+ * GET /api/v1/search/number?q={phone}
+ * Accessible by: closer, company_admin (if flag on), super_admin, readonly_admin
+ */
+
+const express = require('express');
+const router = express.Router();
+const { searchNumber, normalizePhone } = require('../services/vicidial');
+const { supabase } = require('../services/supabase');
+const { requireAuth } = require('../middleware/auth');
+const { requireRole } = require('../middleware/role');
+
+const ALLOWED_ROLES = ['closer', 'company_admin', 'super_admin', 'readonly_admin'];
+
+router.get('/number', requireAuth, requireRole(ALLOWED_ROLES), async (req, res) => {
+  const { q } = req.query;
+  const user = req.user;
+
+  if (!q) {
+    return res.status(400).json({ error: 'Phone number required' });
+  }
+
+  // Company admin must have number_search feature flag enabled
+  if (user.role === 'company_admin') {
+    const flags = user.company?.feature_flags || {};
+    if (!flags.number_search) {
+      return res.status(403).json({ error: 'Number search not enabled for your company' });
+    }
+  }
+
+  const phone = normalizePhone(q);
+  if (!phone) {
+    return res.status(400).json({ error: 'Invalid phone number format' });
+  }
+
+  try {
+    // Fetch CRM records from Supabase
+    // Closers and super admins see ALL companies
+    // Company admins see ALL companies too (by design — search is cross-company)
+    const { data: closerRecords, error: crErr } = await supabase
+      .from('closer_records')
+      .select(`
+        *,
+        closer:users!closer_id(full_name),
+        plan:plans(name),
+        client:clients(name),
+        company:companies(name, display_name)
+      `)
+      .eq('customer_phone', phone.e164)
+      .order('created_at', { ascending: false });
+
+    if (crErr) throw crErr;
+
+    // Flatten joins for cleaner response
+    const flatRecords = (closerRecords || []).map(r => ({
+      ...r,
+      closer_name:  r.closer?.full_name || r.fronter_name || 'Unknown',
+      plan_name:    r.plan?.name || null,
+      client_name:  r.client?.name || null,
+      company_name: r.company?.display_name || null,
+    }));
+
+    // Apply search_field_config visibility filter
+    const visibleRecords = await applyFieldVisibility(flatRecords, user, supabase);
+
+    // Run unified search (CRM + ViciDial)
+    const result = await searchNumber(q, visibleRecords);
+
+    return res.json(result);
+
+  } catch (err) {
+    console.error('[Search] error:', err.message);
+    return res.status(500).json({ error: 'Search failed', detail: err.message });
+  }
+});
+
+/**
+ * Apply search_field_config to strip fields the user should not see.
+ * Hidden fields are replaced with null (frontend shows "Not available").
+ */
+async function applyFieldVisibility(records, user, supabase) {
+  try {
+    const { data: config } = await supabase
+      .from('search_field_config')
+      .select('fields')
+      .eq('role', user.role)
+      .single();
+
+    if (!config || !config.fields) return records;
+
+    const fields = config.fields; // { customer_email: false, customer_dob: false, ... }
+
+    return records.map(rec => {
+      const filtered = { ...rec };
+      Object.keys(fields).forEach(field => {
+        if (fields[field] === false) {
+          filtered[field] = null; // hide field — frontend shows "Not available"
+        }
+      });
+      return filtered;
+    });
+  } catch (_) {
+    return records; // if config fails, return unfiltered (safe default)
+  }
+}
+
+module.exports = router;
+```
+
+---
+
+## Part 4 — Environment Variables to Add
+
+Add these to your `.env` and Coolify environment:
+
+```env
+# ViciDial — Closer dialer (tmcsolinb.i5.tel)
+VICIDIAL_URL=https://tmcsolinb.i5.tel
+VICIDIAL_API_USER=apiuser
+VICIDIAL_API_PASS=apiuser123
+VICIDIAL_API_PATH=/vicidial/non_agent_api.php
+VICIDIAL_CAMPAIGN=IHP_01
+VICIDIAL_MIN_CALL_DURATION=60
+```
+
+---
+
+## Part 5 — Key Rules for Claude IDE (Phase 8 Specific)
+
+- **Never expose ViciDial credentials to frontend.** All ViciDial calls happen server-side only in `vicidial.js`.
+- **Always normalize phone before any ViciDial call.** Use `normalizePhone()` — it handles all formats.
+- **Always check Redis before calling ViciDial.** `vdlog:{e164}` TTL 1h. `vd:agent_map` TTL 60s.
+- **Never block search if ViciDial is down.** All ViciDial calls are wrapped in try/catch. Return CRM data with `vicidial_available: false` if ViciDial fails.
+- **Duration filter is the key quality gate.** Only calls > 60 seconds reach the timeline. This is set via `VICIDIAL_MIN_CALL_DURATION` env var.
+- **Agent name resolution priority:** CRM match first → live agent map second → ID fallback third. Never show blank agent name.
+- **`phone_number_log` is the only confirmed working history function.** Do not attempt `get_call_notes`, `call_log`, or `call_dispo_report` — these are not available on this server.
+- **`lead_search` returns only `phone|count|lead_id`.** Do not attempt `query_fields` — this server ignores it.
+- **`logged_in_agents` requires `campaign_id=IHP_01`.** Cache result 60 seconds.
+
+---
+
+*BizTrixVenture CRM — ViciDial Integration Doc | Phase 8 ready to build.*
 
 ## 9. Multi-Policy / Returning Customer Flow
 

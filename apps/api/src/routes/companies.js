@@ -14,47 +14,64 @@ router.use(authenticate);
 // GET /companies - List all companies (Super Admin / Readonly Admin)
 router.get('/', roleGuard('super_admin', 'readonly_admin'), async (req, res) => {
   try {
+    // Get Sale Made disposition ID once (cache it)
+    const { data: saleDisposition } = await supabase
+      .from('dispositions')
+      .select('id')
+      .eq('label', 'Sale Made')
+      .single();
+
     const { data: companies, error } = await supabase
       .from('companies')
       .select(`
-        *,
+        id,
+        name,
+        display_name,
+        slug,
+        is_active,
+        created_at,
         users!users_company_id_fkey (count)
       `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    // Get stats for each company
-    const companiesWithStats = await Promise.all(
-      companies.map(async (company) => {
-        const [transferCount, salesCount] = await Promise.all([
-          supabase
-            .from('transfers')
-            .select('id', { count: 'exact', head: true })
-            .eq('company_id', company.id),
-          supabase
-            .from('outcomes')
-            .select('id', { count: 'exact', head: true })
-            .eq('company_id', company.id)
-            .eq('disposition_id', (
-              await supabase
-                .from('dispositions')
-                .select('id')
-                .eq('label', 'Sale Made')
-                .single()
-            ).data?.id),
-        ]);
+    // Get all stats in parallel batches to reduce load
+    const companyIds = companies.map(c => c.id);
+    
+    // Get transfer counts for all companies at once
+    const { data: transferCounts } = await supabase
+      .from('transfers')
+      .select('company_id')
+      .in('company_id', companyIds);
 
-        return {
-          ...company,
-          stats: {
-            transferCount: transferCount.count || 0,
-            salesCount: salesCount.count || 0,
-            userCount: company.users?.[0]?.count || 0,
-          },
-        };
-      })
-    );
+    // Get outcome counts for all companies
+    const { data: outcomeCounts } = await supabase
+      .from('outcomes')
+      .select('company_id')
+      .in('company_id', companyIds)
+      .eq('disposition_id', saleDisposition?.id);
+
+    // Count by company ID
+    const transfersByCompany = {};
+    const outcomesByCompany = {};
+    
+    (transferCounts || []).forEach(t => {
+      transfersByCompany[t.company_id] = (transfersByCompany[t.company_id] || 0) + 1;
+    });
+    
+    (outcomeCounts || []).forEach(o => {
+      outcomesByCompany[o.company_id] = (outcomesByCompany[o.company_id] || 0) + 1;
+    });
+
+    const companiesWithStats = companies.map(company => ({
+      ...company,
+      stats: {
+        transferCount: transfersByCompany[company.id] || 0,
+        salesCount: outcomesByCompany[company.id] || 0,
+        userCount: company.users?.[0]?.count || 0,
+      },
+    }));
 
     res.json({ companies: companiesWithStats });
   } catch (err) {
