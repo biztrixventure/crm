@@ -6,6 +6,7 @@ import { validateQuery } from '../middleware/validate.js';
 import { searchNumberSchema } from '../schemas/number.schema.js';
 import { searchLimiter } from '../middleware/rateLimit.js';
 import { getRedis, isRedisConnected, markNumberSold } from '../services/redis.js';
+import vicidial from '../services/vicidial.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ function normalizeToE164(phone) {
   return `+${digits}`;
 }
 
-// GET /search/number - Check if number is sold
+// GET /search/number - Comprehensive search: CRM + ViciDial
 router.get(
   '/number',
   searchLimiter,
@@ -42,54 +43,95 @@ router.get(
 
     try {
       const normalizedPhone = normalizeToE164(phone);
+      const phoneDigits = normalizedPhone.replace(/\D/g, '').slice(-10);
 
-      // Check Redis cache first when available
+      // Step 1: Check Redis cache for CRM result
       const redis = getRedis();
+      let crmData = null;
       if (isRedisConnected() && redis) {
         const cacheKey = `sold:${normalizedPhone}`;
         const cached = await redis.get(cacheKey);
-
         if (cached !== null) {
-          return res.json({
-            phone: normalizedPhone,
-            sold: cached === 'yes',
-            source: 'cache',
-          });
+          crmData = { isSold: cached === 'yes', source: 'cache' };
         }
       }
 
-      // Cache miss - query database
-      const { data: saleDisposition } = await supabase
-        .from('dispositions')
-        .select('id')
-        .eq('label', 'Sale Made')
-        .single();
+      // Step 2: Query CRM if not in cache
+      if (!crmData) {
+        const { data: saleDisposition } = await supabase
+          .from('dispositions')
+          .select('id')
+          .eq('label', 'Sale Made')
+          .single();
 
-      if (!saleDisposition) {
-        return res.status(500).json({ error: 'System configuration error' });
+        const { data: outcomes, error } = await supabase
+          .from('outcomes')
+          .select(`
+            id,
+            customer_phone,
+            customer_name,
+            customer_email,
+            remarks,
+            created_at,
+            closer:users!outcomes_closer_id_fkey (id, full_name),
+            company:companies!outcomes_company_id_fkey (id, name, display_name),
+            dispositions (id, label)
+          `)
+          .eq('customer_phone', normalizedPhone)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        crmData = {
+          isSold: saleDisposition ? outcomes.some(o => o.disposition_id === saleDisposition.id) : false,
+          outcomes: outcomes || [],
+          source: 'database',
+        };
+
+        // Write to Redis cache (24h TTL)
+        await markNumberSold(normalizedPhone, crmData.isSold);
       }
 
-      const { data: outcome, error } = await supabase
-        .from('outcomes')
-        .select('id')
-        .eq('customer_phone', normalizedPhone)
-        .eq('disposition_id', saleDisposition.id)
-        .limit(1)
-        .maybeSingle();
+      // Step 3: Get ViciDial data if available (and not fully cached)
+      let vicidialData = null;
+      if (vicidial.isConfigured()) {
+        // Check Redis cache for ViciDial data
+        if (isRedisConnected() && redis && !crmData.outcomes) {
+          const vdCacheKey = `vdlead:${normalizedPhone}`;
+          const vdCached = await redis.get(vdCacheKey);
+          if (vdCached) {
+            vicidialData = JSON.parse(vdCached);
+          }
+        }
 
-      if (error) {
-        throw error;
+        // Fetch from ViciDial if not cached
+        if (!vicidialData) {
+          const leads = await vicidial.searchLead(phoneDigits);
+          if (leads && leads.length > 0) {
+            // Get dispositions for first lead
+            const dispositions = await vicidial.getLeadDispositions(leads[0].lead_id);
+            vicidialData = {
+              leads,
+              dispositions,
+            };
+
+            // Cache ViciDial data (1h TTL)
+            if (isRedisConnected() && redis) {
+              const vdCacheKey = `vdlead:${normalizedPhone}`;
+              await redis.setex(vdCacheKey, 3600, JSON.stringify(vicidialData));
+            }
+          }
+        }
       }
 
-      const isSold = outcome !== null;
-
-      // Write to Redis cache (24h TTL)
-      await markNumberSold(normalizedPhone, isSold);
-
+      // Step 4: Build response
       res.json({
         phone: normalizedPhone,
-        sold: isSold,
-        source: 'database',
+        sold: crmData.isSold,
+        source: crmData.source,
+        crm_records: crmData.outcomes || [],
+        vicidial_available: vicidial.isConfigured(),
+        vicidial_data: vicidialData,
       });
     } catch (err) {
       console.error('Number search error:', err);
