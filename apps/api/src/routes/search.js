@@ -90,7 +90,7 @@ router.get(
           disposition_id,
           closer:users!outcomes_closer_id_fkey (id, full_name),
           company:companies!outcomes_company_id_fkey (id, name, display_name),
-          dispositions (id, label)
+          disposition:dispositions!outcomes_disposition_id_fkey (id, label)
         `)
         .eq('customer_phone', normalizedPhone)
         .order('created_at', { ascending: false });
@@ -137,7 +137,7 @@ router.get(
           closer_name: r.closer?.full_name,
           fronter_name: r.fronter_name,
           company_name: r.company?.display_name || r.company?.name,
-          disposition_code: r.dispositions?.label,
+          disposition_code: r.disposition?.label,
           remarks: r.remarks || '',
         })),
       });
