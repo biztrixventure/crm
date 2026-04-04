@@ -8,6 +8,7 @@ import { Phone, CheckCircle, XCircle, Loader2, Plus } from 'lucide-react';
 import { formatDateTime, cn, normalizePhone } from '../lib/utils';
 import CallbacksManager from '../components/CallbacksManager';
 import NewPolicyForm from '../components/NewPolicyForm';
+import CloserRecordForm from '../components/CloserRecordForm';
 
 // Number Search component
 function NumberSearch() {
@@ -331,8 +332,11 @@ function Overview() {
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <OutcomeForm onSubmit={() => setRefreshKey((v) => v + 1)} />
         <NumberSearch />
+      </div>
+
+      <div>
+        <CloserRecordForm onSuccess={() => setRefreshKey((v) => v + 1)} />
       </div>
 
       <div key={refreshKey}>
