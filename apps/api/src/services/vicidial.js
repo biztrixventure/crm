@@ -4,6 +4,7 @@ const VICIDIAL_BASE = process.env.VICIDIAL_URL;
 const API_PATH = process.env.VICIDIAL_API_PATH || '/vicidial/non_agent_api.php';
 const API_USER = process.env.VICIDIAL_API_USER;
 const API_PASS = process.env.VICIDIAL_API_PASS;
+const MIN_CALL_DURATION = parseInt(process.env.VICIDIAL_MIN_CALL_DURATION || '60');
 
 function normalizePhone(phone) {
   const digits = phone.replace(/\D/g, '');
@@ -40,6 +41,56 @@ async function searchLead(phone10digit) {
   } catch (err) {
     console.error('ViciDial lead search error:', err.message);
     return null;
+  }
+}
+
+// Get full call history for a phone number
+async function getPhoneNumberLog(phone10digit) {
+  if (!isConfigured()) {
+    console.warn('ViciDial not configured');
+    return [];
+  }
+
+  try {
+    const url = `${VICIDIAL_BASE}${API_PATH}`;
+    const params = new URLSearchParams({
+      source: 'test',
+      user: API_USER,
+      pass: API_PASS,
+      function: 'phone_number_log',
+      phone_number: phone10digit,
+    });
+
+    const res = await axios.get(`${url}?${params}`, { timeout: 10000 });
+    return parsePhoneNumberLog(res.data);
+  } catch (err) {
+    console.error('ViciDial phone_number_log error:', err.message);
+    return [];
+  }
+}
+
+// Get live logged-in agents
+async function getLoggedInAgents(campaignId) {
+  if (!isConfigured()) {
+    console.warn('ViciDial not configured');
+    return {};
+  }
+
+  try {
+    const url = `${VICIDIAL_BASE}${API_PATH}`;
+    const params = new URLSearchParams({
+      source: 'test',
+      user: API_USER,
+      pass: API_PASS,
+      function: 'logged_in_agents',
+      campaign_id: campaignId,
+    });
+
+    const res = await axios.get(`${url}?${params}`, { timeout: 10000 });
+    return parseLoggedInAgents(res.data);
+  } catch (err) {
+    console.error('ViciDial logged_in_agents error:', err.message);
+    return {};
   }
 }
 
@@ -95,6 +146,66 @@ function parseViciDialResponse(data) {
   });
 }
 
+// Parse phone_number_log response
+// Format: phone|datetime|list_id|duration|disposition|call_type|status|extra|campaign_id
+function parsePhoneNumberLog(data) {
+  if (!data || data.includes('ERROR')) {
+    return [];
+  }
+
+  const lines = data.split('\n').filter(l => l.trim() && !l.includes('ERROR'));
+  
+  return lines
+    .map(line => {
+      const parts = line.split('|');
+      const durationSeconds = parseInt(parts[3]?.trim() || '0');
+      
+      // Filter: keep only calls > MIN_CALL_DURATION (real conversations)
+      if (durationSeconds <= MIN_CALL_DURATION) {
+        return null;
+      }
+
+      return {
+        phone_number: parts[0]?.trim() || '',
+        call_datetime: parts[1]?.trim() || '',
+        list_id: parts[2]?.trim() || '',
+        duration_seconds: durationSeconds,
+        duration_display: formatDuration(durationSeconds),
+        disposition_code: parts[4]?.trim() || '',
+        call_type: parts[5]?.trim() || '',
+        status: parts[6]?.trim() || '',
+        campaign_id: parts[8]?.trim() || '',
+        agent_name: null, // Will be resolved later
+        agent_source: null, // crm_match | cache | fallback
+      };
+    })
+    .filter(d => d !== null)
+    .sort((a, b) => new Date(b.call_datetime) - new Date(a.call_datetime)); // Newest first
+}
+
+// Parse logged_in_agents response
+// Format: user_id|campaign_id|phone_ext|agent_status|lead_id|call_id|duration_sec|agent_name|server|flag
+function parseLoggedInAgents(data) {
+  if (!data || data.includes('ERROR')) {
+    return {};
+  }
+
+  const agentMap = {};
+  const lines = data.split('\n').filter(l => l.trim() && !l.includes('ERROR'));
+  
+  lines.forEach(line => {
+    const parts = line.split('|');
+    const userId = parts[0]?.trim();
+    const agentName = parts[7]?.trim();
+    
+    if (userId && agentName) {
+      agentMap[userId] = agentName;
+    }
+  });
+
+  return agentMap;
+}
+
 function parseDispositions(data) {
   // Format: date|time|agent|disposition_code|duration|comments
   if (!data || data.includes('ERROR')) {
@@ -125,9 +236,23 @@ function parseDispositions(data) {
     .filter(d => d !== null);
 }
 
+// Format duration in seconds to "Xm Ys" format
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0s';
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (minutes > 0) {
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  }
+  return `${secs}s`;
+}
+
 export default {
   isConfigured,
   normalizePhone,
   searchLead,
+  getPhoneNumberLog,
+  getLoggedInAgents,
   getLeadDispositions,
+  formatDuration,
 };
