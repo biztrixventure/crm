@@ -34,26 +34,29 @@ router.get('/', async (req, res) => {
           name,
           display_name
         )
-      `, { count: 'exact' })
+      `)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .range(offset, offset + limit);
 
     // Company admins can only see their own company's users
     if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
     }
 
-    const { data: users, error, count } = await query;
+    const { data: users, error } = await query;
 
     if (error) throw error;
 
+    // Check if there are more results (limit + 1 to detect hasMore)
+    const hasMore = users && users.length > limit;
+    const visibleUsers = users ? users.slice(0, limit) : [];
+
     res.json({ 
-      users: users || [],
+      users: visibleUsers || [],
       pagination: {
-        total: count || 0,
         limit,
         offset,
-        hasMore: count > offset + limit
+        hasMore,
       }
     });
   } catch (err) {
