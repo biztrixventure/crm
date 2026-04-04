@@ -44,7 +44,10 @@ router.get('/', async (req, res) => {
       .eq('role', role)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error && error.code !== 'PGRST116') {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
     // Return config or defaults
     const fields = config?.fields || DEFAULT_FIELDS;
@@ -52,7 +55,7 @@ router.get('/', async (req, res) => {
     res.json({ fields, scope, role });
   } catch (err) {
     console.error('Get search config error:', err);
-    res.status(500).json({ error: 'Failed to fetch config' });
+    res.status(500).json({ error: err.message || 'Failed to fetch config' });
   }
 });
 

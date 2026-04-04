@@ -22,12 +22,15 @@ router.get('/', async (req, res) => {
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
     res.json({ clients: clients || [] });
   } catch (err) {
     console.error('Get clients error:', err);
-    res.status(500).json({ error: 'Failed to fetch clients' });
+    res.status(500).json({ error: err.message || 'Failed to fetch clients' });
   }
 });
 
