@@ -26,7 +26,7 @@ router.get('/', validateQuery(transferQuerySchema), async (req, res) => {
         closer:users!transfers_closer_id_fkey (id, full_name, email),
         company:companies!transfers_company_id_fkey (id, name, display_name),
         outcomes (id, disposition_id, dispositions (label))
-      `, { count: 'exact' })
+      `)
       .order('created_at', { ascending: false });
 
     // Role-based filtering
@@ -46,21 +46,24 @@ router.get('/', validateQuery(transferQuerySchema), async (req, res) => {
     if (from) query = query.gte('created_at', from);
     if (to) query = query.lte('created_at', to);
 
-    // Pagination
+    // Pagination with hasMore detection (no full table scan)
     const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1);
+    query = query.range(offset, offset + limit); // Request limit+1 to detect hasMore
 
-    const { data: transfers, error, count } = await query;
+    const { data: transfers, error } = await query;
 
     if (error) throw error;
 
+    // hasMore is true if we got more records than requested
+    const hasMore = transfers.length > limit;
+    const paginatedTransfers = transfers.slice(0, limit);
+
     res.json({
-      transfers,
+      transfers: paginatedTransfers,
       pagination: {
         page,
         limit,
-        total: count,
-        totalPages: Math.ceil(count / limit),
+        hasMore,
       },
     });
   } catch (err) {
