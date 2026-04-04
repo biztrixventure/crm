@@ -146,10 +146,17 @@ router.get(
 
             // Try to match with CRM record by vicidial_lead_id
             if (call.list_id) {
-              const crmMatch = crmRecords?.find(
-                r => r.vicidial_lead_id === call.list_id &&
-                     Math.abs(new Date(r.created_at) - new Date(call.call_datetime)) < 1800000 // 30 min window
-              );
+              const crmMatch = crmRecords?.find(r => {
+                if (!r.vicidial_lead_id || r.vicidial_lead_id !== call.list_id) {
+                  return false;
+                }
+                try {
+                  const timeDiff = Math.abs(new Date(r.created_at) - new Date(call.call_datetime));
+                  return timeDiff < 1800000; // 30 min window
+                } catch (e) {
+                  return false;
+                }
+              });
               if (crmMatch && crmMatch.closer?.full_name) {
                 agentName = crmMatch.closer.full_name;
                 agentSource = 'crm_match';
