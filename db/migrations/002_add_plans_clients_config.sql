@@ -49,10 +49,7 @@ CREATE INDEX idx_search_field_config_scope_role ON search_field_config(scope, ro
 -- ===========================================
 -- ROW LEVEL SECURITY
 -- ===========================================
-
-ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE search_field_config ENABLE ROW LEVEL SECURITY;
+-- RLS disabled: API uses service role key which bypasses RLS anyway
 
 -- ===========================================
 -- SEED DATA
