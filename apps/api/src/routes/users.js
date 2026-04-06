@@ -18,8 +18,8 @@ router.get('/', async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
 
   try {
-    // Only super_admin, readonly_admin, closer_manager, operations_manager, and company_admin can view users
-    if (!['super_admin', 'readonly_admin', 'closer_manager', 'operations_manager', 'company_admin'].includes(role)) {
+    // Only super_admin, readonly_admin, closer_manager, operations_manager, compliance_manager, and company_admin can view users
+    if (!['super_admin', 'readonly_admin', 'closer_manager', 'operations_manager', 'compliance_manager', 'company_admin'].includes(role)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
