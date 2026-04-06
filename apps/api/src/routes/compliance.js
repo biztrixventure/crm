@@ -363,7 +363,7 @@ router.get('/batches/:id', async (req, res) => {
   }
 });
 
-// PATCH /compliance/batches/:id/assign - Assign/reassign agent [manager only]
+// PATCH /compliance/batches/:id/assign - Assign/reassign agent [manager only, pending batches only]
 router.patch('/batches/:id/assign', ensureComplianceManager, async (req, res) => {
   const { id: batchId } = req.params;
   const { assign_to } = req.body;
@@ -373,6 +373,24 @@ router.patch('/batches/:id/assign', ensureComplianceManager, async (req, res) =>
   }
 
   try {
+    // Get batch and check status
+    const { data: batch, error: batchError } = await supabase
+      .from('compliance_batches')
+      .select('id, status')
+      .eq('id', batchId)
+      .single();
+
+    if (batchError || !batch) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    // Only allow reassignment for pending batches (no work started)
+    if (batch.status !== 'pending') {
+      return res.status(422).json({
+        error: `Cannot reassign batch in ${batch.status} status. Only pending batches can be reassigned.`
+      });
+    }
+
     // Verify new agent is compliance_agent
     const { data: agent, error: agentError } = await supabase
       .from('users')

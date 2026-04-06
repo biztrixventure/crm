@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
-import { Loader2, Plus, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, ChevronRight, Edit2 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,6 +9,9 @@ export default function ComplianceBatches() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showReassignForm, setShowReassignForm] = useState(false);
+  const [selectedBatchForReassign, setSelectedBatchForReassign] = useState(null);
+  const [reassignData, setReassignData] = useState({ assign_to: '' });
   const [companies, setCompanies] = useState([]);
   const [agents, setAgents] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +60,32 @@ export default function ComplianceBatches() {
       setAgents(res.data.users || []);
     } catch (error) {
       console.error('Failed to fetch agents:', error);
+    }
+  }
+
+  async function handleReassignBatch() {
+    if (!reassignData.assign_to) {
+      toast.error('Please select an agent');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.patch(`/compliance/batches/${selectedBatchForReassign.id}/assign`, {
+        assign_to: reassignData.assign_to,
+      });
+
+      const agent = agents.find(a => a.id === reassignData.assign_to);
+      toast.success(`Batch reassigned to ${agent?.full_name}`);
+      setShowReassignForm(false);
+      setSelectedBatchForReassign(null);
+      setReassignData({ assign_to: '' });
+      fetchBatches();
+    } catch (error) {
+      console.error('Failed to reassign batch:', error);
+      toast.error(error.response?.data?.error || 'Failed to reassign batch');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -274,12 +303,27 @@ export default function ComplianceBatches() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => navigate(`/compliance/batches/${batch.id}`)}
-                      className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      {isManager && batch.status === 'pending' && (
+                        <button
+                          onClick={() => {
+                            setSelectedBatchForReassign(batch);
+                            setReassignData({ assign_to: batch.assigned_to || '' });
+                            setShowReassignForm(true);
+                          }}
+                          className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                          title="Reassign agent (pending batches only)"
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigate(`/compliance/batches/${batch.id}`)}
+                        className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -287,6 +331,67 @@ export default function ComplianceBatches() {
           </tbody>
         </table>
       </div>
+
+      {/* Reassign Modal */}
+      {showReassignForm && selectedBatchForReassign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl max-w-lg w-full mx-4">
+            <div className="border-b border-cream-200 dark:border-dark-700 p-6">
+              <h2 className="text-xl font-bold text-primary-900 dark:text-primary-100">Reassign Batch Agent</h2>
+              <p className="text-sm text-primary-600 dark:text-primary-400 mt-1">
+                {selectedBatchForReassign.company?.display_name} • {selectedBatchForReassign.date_from} to {selectedBatchForReassign.date_to}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
+                  Select Compliance Agent *
+                </label>
+                <select
+                  value={reassignData.assign_to}
+                  onChange={(e) => setReassignData({ ...reassignData, assign_to: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select an agent...</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.full_name} ({agent.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  <strong>Note:</strong> You can only reassign pending batches. Once work starts, reassignment is not allowed.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleReassignBatch}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+                >
+                  {submitting ? 'Reassigning...' : 'Reassign Batch'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReassignForm(false);
+                    setSelectedBatchForReassign(null);
+                    setReassignData({ assign_to: '' });
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-cream-200 dark:bg-dark-700 text-primary-900 dark:text-primary-100 rounded-lg transition-colors hover:bg-cream-300 dark:hover:bg-dark-600 font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
