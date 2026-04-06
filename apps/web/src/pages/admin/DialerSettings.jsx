@@ -65,26 +65,28 @@ export default function DialerSettings() {
     setTestResult(null);
 
     try {
-      // Build test URL for client-side request
-      const testUrl = `${config.dialer_url}${config.api_path}?function=lead_search&user=${config.api_user}&pass=${config.api_pass}&source=test&phone_number=0000000000&stage=pipe&header=YES`;
-      
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        mode: 'cors',
+      // Use server proxy to test connection (avoids CORS)
+      const response = await api.post('/vicidial-proxy/test', {
+        dialer_url: config.dialer_url,
+        api_user: config.api_user,
+        api_pass: config.api_pass,
+        api_path: config.api_path || '/vicidial/non_agent_api.php',
       });
       
-      const text = await response.text();
-      
-      if (text.includes('ERROR') || !response.ok) {
-        setTestResult({ success: false, message: text || 'Connection failed' });
-      } else {
+      if (response.data.success) {
         setTestResult({ success: true, message: 'Connection successful! API is responding.' });
+      } else {
+        setTestResult({ 
+          success: false, 
+          message: response.data.message || 'Connection failed',
+          details: response.data.response 
+        });
       }
     } catch (error) {
       console.error('Dialer test error:', error);
       setTestResult({ 
         success: false, 
-        message: `Connection failed: ${error.message}. This may be a CORS issue - the dialer may still work from closer browsers.`
+        message: `Connection failed: ${error.response?.data?.details || error.message}`
       });
     } finally {
       setTesting(false);
@@ -122,15 +124,14 @@ export default function DialerSettings() {
         </div>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
         <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800 dark:text-amber-200">
-            <p className="font-medium">Client-Side API Calls</p>
-            <p className="mt-1 text-amber-700 dark:text-amber-300">
-              API calls to the dialer are made directly from the closer's browser (not the server). 
-              This is required because the dialer may not respond to server-side requests. 
-              Credentials will be visible in browser network requests.
+          <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800 dark:text-blue-200">
+            <p className="font-medium">Server-Side Proxy</p>
+            <p className="mt-1 text-blue-700 dark:text-blue-300">
+              API calls to ViciDial are proxied through our server to bypass CORS restrictions. 
+              The credentials are stored securely and never exposed to the browser.
             </p>
           </div>
         </div>

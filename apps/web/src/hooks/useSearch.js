@@ -189,14 +189,11 @@ export function useSearch() {
     fetchDialerConfig();
   }, []);
 
-  // Fetch from ViciDial (client-side) with proper field mapping
+  // Fetch from ViciDial via server proxy (bypasses CORS)
   async function fetchViciDial(phoneDigits) {
-    if (!dialerConfig?.is_active || !dialerConfig?.dialer_url) {
+    if (!dialerConfig?.is_active) {
       return null;
     }
-
-    const baseUrl = `${dialerConfig.dialer_url}${dialerConfig.api_path || '/vicidial/non_agent_api.php'}`;
-    const baseParams = `user=${dialerConfig.api_user}&pass=${dialerConfig.api_pass}&source=test&stage=pipe&header=YES`;
 
     let leadId = null;
     let leadInfo = null;
@@ -205,22 +202,26 @@ export function useSearch() {
     const errors = [];
 
     try {
-      // API 1: Lead Search by Phone → get lead_id
-      const leadSearchUrl = `${baseUrl}?function=lead_search&${baseParams}&phone_number=${phoneDigits}`;
-      const leadSearchRes = await fetch(leadSearchUrl, { mode: 'cors' });
-      const leadSearchText = await leadSearchRes.text();
-      const leadSearchData = parseViciDialResponse(leadSearchText);
-
-      if (leadSearchData.data?.length > 0) {
-        leadId = leadSearchData.data[0]?.lead_id;
+      // API 1: Lead Search by Phone → get lead_id (via server proxy)
+      const leadSearchRes = await api.post('/vicidial-proxy/lead-search', { 
+        phone_number: phoneDigits 
+      });
+      
+      if (leadSearchRes.data.success && leadSearchRes.data.data) {
+        const leadSearchData = parseViciDialResponse(leadSearchRes.data.data);
+        if (leadSearchData.data?.length > 0) {
+          leadId = leadSearchData.data[0]?.lead_id;
+        }
       }
 
       // API 1b: Lead All Info (if we have lead_id)
       if (leadId) {
-        const leadInfoUrl = `${baseUrl}?function=lead_all_info&${baseParams}&lead_id=${leadId}`;
-        const leadInfoRes = await fetch(leadInfoUrl, { mode: 'cors' });
-        const leadInfoText = await leadInfoRes.text();
-        leadInfo = parseLeadAllInfo(leadInfoText);
+        const leadInfoRes = await api.post('/vicidial-proxy/lead-info', { 
+          lead_id: leadId 
+        });
+        if (leadInfoRes.data.success && leadInfoRes.data.data) {
+          leadInfo = parseLeadAllInfo(leadInfoRes.data.data);
+        }
       }
     } catch (err) {
       console.error('ViciDial lead search error:', err);
@@ -229,11 +230,13 @@ export function useSearch() {
 
     try {
       // API 2: Phone Number Log (call history) - CRITICAL for disposition
-      const callLogUrl = `${baseUrl}?function=phone_number_log&${baseParams}&phone_number=${phoneDigits}&type=ALL`;
-      const callLogRes = await fetch(callLogUrl, { mode: 'cors' });
-      const callLogText = await callLogRes.text();
-      const callLogData = parseViciDialResponse(callLogText);
-      callHistory = callLogData.data || [];
+      const callLogRes = await api.post('/vicidial-proxy/phone-log', { 
+        phone_number: phoneDigits 
+      });
+      if (callLogRes.data.success && callLogRes.data.data) {
+        const callLogData = parseViciDialResponse(callLogRes.data.data);
+        callHistory = callLogData.data || [];
+      }
     } catch (err) {
       console.error('ViciDial call log error:', err);
       errors.push('phone_number_log');
@@ -242,11 +245,13 @@ export function useSearch() {
     try {
       // API 3: Recording Lookup (if we have lead_id)
       if (leadId) {
-        const recordingUrl = `${baseUrl}?function=recording_lookup&${baseParams}&lead_id=${leadId}`;
-        const recordingRes = await fetch(recordingUrl, { mode: 'cors' });
-        const recordingText = await recordingRes.text();
-        const recordingData = parseViciDialResponse(recordingText);
-        recordings = recordingData.data || [];
+        const recordingRes = await api.post('/vicidial-proxy/recording', { 
+          lead_id: leadId 
+        });
+        if (recordingRes.data.success && recordingRes.data.data) {
+          const recordingData = parseViciDialResponse(recordingRes.data.data);
+          recordings = recordingData.data || [];
+        }
       }
     } catch (err) {
       console.error('ViciDial recording lookup error:', err);

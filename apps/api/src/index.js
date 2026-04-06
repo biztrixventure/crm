@@ -44,6 +44,7 @@ import searchRoutes from './routes/search.js';
 import searchConfigRoutes from './routes/search-config.js';
 import auditRoutes from './routes/audit.js';
 import dialerConfigRoutes from './routes/dialer-config.js';
+import vicidialProxyRoutes from './routes/vicidial-proxy.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,6 +107,7 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/search-config', searchConfigRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/dialer-config', dialerConfigRoutes);
+app.use('/api/v1/vicidial-proxy', vicidialProxyRoutes);
 
 // 404 handler
 app.use((req, res) => {
