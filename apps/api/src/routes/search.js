@@ -19,10 +19,10 @@ function normalizePhoneLocal(phone) {
   return digits.slice(-10); // Get last 10 digits
 }
 
-// GET /search/number - Search for customer by phone number
+// GET /search/number - Search for customer by phone number (sold/not sold status)
 router.get(
   '/number',
-  roleGuard('closer', 'closer_manager', 'operations_manager'),
+  roleGuard('super_admin', 'company_admin', 'closer', 'closer_manager', 'compliance_manager', 'compliance_agent', 'operations_manager'),
   async (req, res) => {
     const { phone } = req.query;
 
@@ -60,7 +60,7 @@ router.get(
           .order('created_at', { ascending: false })
           .limit(10),
 
-        // Search closer records
+        // Search closer records with disposition info
         supabase
           .from('closer_records')
           .select(
@@ -99,6 +99,7 @@ router.get(
           closer_name: t.closer?.full_name,
           fronter_name: t.fronter?.full_name,
           created_at: t.created_at,
+          is_sold: false, // Transfers are not yet completed sales
         })),
         ...(closerRecords.data || []).map((r) => ({
           type: 'record',
@@ -112,6 +113,7 @@ router.get(
           disposition: r.dispositions?.label,
           closer_name: r.closer?.full_name,
           created_at: r.created_at,
+          is_sold: r.dispositions?.label?.toLowerCase() === 'sold', // Determine if sold
         })),
       ];
 

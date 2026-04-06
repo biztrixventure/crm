@@ -11,6 +11,7 @@ import OperationsTransfers from './operations/Transfers';
 import OperationsRecords from './operations/Records';
 import OperationsUsers from './operations/Users';
 import OperationsCallbacks from './operations/Callbacks';
+import NumberSearch from './shared/NumberSearch';
 
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
   const colors = {
@@ -146,6 +147,7 @@ export default function OperationsDashboard() {
           <Route path="/records" element={<OperationsRecords />} />
           <Route path="/users" element={<OperationsUsers />} />
           <Route path="/callbacks" element={<OperationsCallbacks />} />
+          <Route path="/number-search" element={<NumberSearch />} />
         </Routes>
       )}
     </div>
