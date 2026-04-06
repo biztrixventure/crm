@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { formatDateTime, normalizePhone } from '../lib/utils';
 import CallbacksManager from '../components/CallbacksManager';
 import CloserRecordForm from '../components/CloserRecordForm';
+import NumberSearch from './shared/NumberSearch';
 
 // Outcome Form component
 function OutcomeForm({ onSubmit }) {
@@ -326,6 +327,7 @@ export default function CloserDashboard() {
       <Route index element={<Overview />} />
       <Route path="outcomes/*" element={<Outcomes />} />
       <Route path="callbacks/*" element={<Callbacks />} />
+      <Route path="number-search" element={<NumberSearch />} />
     </Routes>
   );
 }

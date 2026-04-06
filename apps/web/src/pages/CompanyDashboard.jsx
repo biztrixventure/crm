@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDateTime, formatPhone, cn } from '../lib/utils';
 import CallbacksManager from '../components/CallbacksManager';
+import NumberSearch from './shared/NumberSearch';
 
 // KPI Card component
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
@@ -862,6 +863,7 @@ export default function CompanyDashboard() {
       <Route path="outcomes/*" element={<Outcomes />} />
       <Route path="fronters/*" element={<Fronters />} />
       <Route path="numbers/*" element={<Numbers />} />
+      <Route path="number-search" element={<NumberSearch />} />
       <Route path="callbacks/*" element={<Callbacks />} />
     </Routes>
   );
