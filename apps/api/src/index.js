@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './startup-check.js'; // Run startup verification first
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -132,9 +133,23 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 BizTrixVenture API running on port ${PORT}`);
+// Better error handling for startup
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+  process.exit(1);
+});
+
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ BizTrixVenture API running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Routes registered: Auth, Companies, Users, Transfers, Outcomes, Dispositions, Plans, Clients, Callbacks, Numbers, Audit, Search, CloserManager, Operations, Compliance`);
+}).on('error', (err) => {
+  console.error('❌ Server startup error:', err);
+  process.exit(1);
 });
 
 export default app;
