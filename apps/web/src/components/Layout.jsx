@@ -16,7 +16,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from 'lucide-animated';
-import { Building2, Phone, FileText } from 'lucide-react';
+import { Building2, Phone, FileText, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { cn, roleLabels, getInitials } from '../lib/utils';
 
@@ -48,6 +48,30 @@ const navigation = {
     { name: 'Dashboard', href: '/closer', icon: HomeIcon },
     { name: 'My Outcomes', href: '/closer/outcomes', icon: FileText },
     { name: 'Callbacks', href: '/closer/callbacks', icon: Phone },
+  ],
+  closer_manager: [
+    { name: 'Dashboard', href: '/closer-manager', icon: HomeIcon },
+    { name: 'My Records', href: '/closer-manager/records', icon: FileText },
+    { name: 'Closers', href: '/closer-manager/closers', icon: UsersIcon },
+    { name: 'Performance', href: '/closer-manager/performance', icon: TrendingUp },
+    { name: 'Transfers', href: '/closer-manager/transfers', icon: Phone },
+    { name: 'Callbacks', href: '/closer-manager/callbacks', icon: Phone },
+  ],
+  operations_manager: [
+    { name: 'Dashboard', href: '/operations', icon: HomeIcon },
+    { name: 'Companies', href: '/operations/companies', icon: Building2 },
+    { name: 'Transfers', href: '/operations/transfers', icon: Phone },
+    { name: 'Records', href: '/operations/records', icon: FileText },
+    { name: 'Users', href: '/operations/users', icon: UsersIcon },
+  ],
+  compliance_manager: [
+    { name: 'Dashboard', href: '/compliance', icon: HomeIcon },
+    { name: 'Records', href: '/compliance/records', icon: FileText },
+    { name: 'Batches', href: '/compliance/batches', icon: FileText },
+    { name: 'DNC List', href: '/compliance/dnc', icon: SettingsIcon },
+  ],
+  compliance_agent: [
+    { name: 'My Batches', href: '/compliance/batches', icon: FileText },
   ],
   fronter: [
     { name: 'Dashboard', href: '/fronter', icon: HomeIcon },
