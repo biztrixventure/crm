@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
   const { role, companyId } = req.user;
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const offset = parseInt(req.query.offset) || 0;
+  const filterRole = req.query.role; // Optional query param to filter by role
 
   try {
     // Only super_admin, readonly_admin, closer_manager, operations_manager, compliance_manager, and company_admin can view users
@@ -42,6 +43,11 @@ router.get('/', async (req, res) => {
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
+
+    // Filter by role if specified
+    if (filterRole) {
+      query = query.eq('role', filterRole);
+    }
 
     // Company admins can only see their own company's users
     if (role === 'company_admin') {
