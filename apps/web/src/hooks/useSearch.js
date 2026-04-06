@@ -207,10 +207,14 @@ export function useSearch() {
         phone_number: phoneDigits 
       });
       
+      console.log('Lead search response:', leadSearchRes.data);
+      
       if (leadSearchRes.data.success && leadSearchRes.data.data) {
         const leadSearchData = parseViciDialResponse(leadSearchRes.data.data);
+        console.log('Parsed lead search:', leadSearchData);
         if (leadSearchData.data?.length > 0) {
           leadId = leadSearchData.data[0]?.lead_id;
+          console.log('Found lead_id:', leadId);
         }
       }
 
@@ -219,8 +223,10 @@ export function useSearch() {
         const leadInfoRes = await api.post('/vicidial-proxy/lead-info', { 
           lead_id: leadId 
         });
+        console.log('Lead info response:', leadInfoRes.data);
         if (leadInfoRes.data.success && leadInfoRes.data.data) {
           leadInfo = parseLeadAllInfo(leadInfoRes.data.data);
+          console.log('Parsed lead info:', leadInfo);
         }
       }
     } catch (err) {
@@ -233,8 +239,10 @@ export function useSearch() {
       const callLogRes = await api.post('/vicidial-proxy/phone-log', { 
         phone_number: phoneDigits 
       });
+      console.log('Call log response:', callLogRes.data);
       if (callLogRes.data.success && callLogRes.data.data) {
         const callLogData = parseViciDialResponse(callLogRes.data.data);
+        console.log('Parsed call log:', callLogData);
         callHistory = callLogData.data || [];
       }
     } catch (err) {
@@ -248,6 +256,7 @@ export function useSearch() {
         const recordingRes = await api.post('/vicidial-proxy/recording', { 
           lead_id: leadId 
         });
+        console.log('Recording response:', recordingRes.data);
         if (recordingRes.data.success && recordingRes.data.data) {
           const recordingData = parseViciDialResponse(recordingRes.data.data);
           recordings = recordingData.data || [];
@@ -260,6 +269,7 @@ export function useSearch() {
 
     // Normalize all data into clean format
     const normalized = normalizeViciDialData(leadInfo, callHistory, recordings);
+    console.log('Normalized ViciDial data:', normalized);
 
     return {
       lead_id: leadId,

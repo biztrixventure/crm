@@ -14,7 +14,6 @@ import CloserRecordForm from '../components/CloserRecordForm';
 function NumberSearch() {
   const { query, result, isLoading, error, handleQueryChange, clearSearch, submitSearch, dialerConfig } = useSearch();
   const [showNewPolicy, setShowNewPolicy] = useState(false);
-  const [showVicidial, setShowVicidial] = useState(false);
 
   // Get normalized ViciDial data
   const vd = result?.vicidial?.normalized;
@@ -99,14 +98,6 @@ function NumberSearch() {
                 </div>
 
               <div className="flex items-center gap-2">
-                {result.vicidial_available && (
-                  <button
-                    onClick={() => setShowVicidial(!showVicidial)}
-                    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium transition"
-                  >
-                    {showVicidial ? 'Hide' : 'Show'} Dialer Data
-                  </button>
-                )}
                 {result.sold && (
                   <button
                     onClick={() => setShowNewPolicy(true)}
@@ -118,10 +109,11 @@ function NumberSearch() {
               </div>
             </div>
 
-            {/* ViciDial Data Panel - Normalized */}
-            {showVicidial && result.vicidial_available && vd && (
+            {/* ViciDial Data Panel - Always show when available */}
+            {result.vicidial_available && vd && (
               <div className="mt-4 space-y-4">
-                {/* Lead Info Card */}
+                {/* Lead Info Card - only show if we have some data */}
+                {(vd.full_name || vd.phone || vd.email || vd.address || vd.agent) && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Lead Information</h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -167,6 +159,7 @@ function NumberSearch() {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Call Details Card - TRUST THIS FOR DISPOSITION */}
                 {vd.call_details && (
