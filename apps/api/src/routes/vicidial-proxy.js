@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import axios from 'axios';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
@@ -10,16 +11,21 @@ router.use(authenticate);
 
 // Helper to get dialer config
 async function getDialerConfig() {
-  const { data, error } = await supabase
-    .from('dialer_config')
-    .select('*')
-    .eq('is_active', true)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('dialer_config')
+      .select('*')
+      .eq('is_active', true)
+      .single();
 
-  if (error || !data) {
+    if (error || !data) {
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error('Error fetching dialer config:', err);
     return null;
   }
-  return data;
 }
 
 // POST /vicidial-proxy/lead-search - Search lead by phone number
@@ -36,18 +42,16 @@ router.post(
 
       const config = await getDialerConfig();
       if (!config) {
-        return res.status(400).json({ error: 'Dialer not configured' });
+        return res.json({ data: null, success: false, error: 'Dialer not configured' });
       }
 
       const url = `${config.dialer_url}${config.api_path}?function=lead_search&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&phone_number=${encodeURIComponent(phone_number)}&stage=pipe&header=YES`;
 
-      const response = await fetch(url);
-      const text = await response.text();
-
-      res.json({ data: text, success: true });
+      const response = await axios.get(url, { timeout: 15000 });
+      res.json({ data: response.data, success: true });
     } catch (err) {
-      console.error('ViciDial lead search error:', err);
-      res.status(500).json({ error: 'Failed to fetch from ViciDial', details: err.message });
+      console.error('ViciDial lead search error:', err.message);
+      res.json({ data: null, success: false, error: err.message });
     }
   }
 );
@@ -66,18 +70,16 @@ router.post(
 
       const config = await getDialerConfig();
       if (!config) {
-        return res.status(400).json({ error: 'Dialer not configured' });
+        return res.json({ data: null, success: false, error: 'Dialer not configured' });
       }
 
       const url = `${config.dialer_url}${config.api_path}?function=phone_number_log&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&phone_number=${encodeURIComponent(phone_number)}&stage=pipe&header=YES&type=ALL`;
 
-      const response = await fetch(url);
-      const text = await response.text();
-
-      res.json({ data: text, success: true });
+      const response = await axios.get(url, { timeout: 15000 });
+      res.json({ data: response.data, success: true });
     } catch (err) {
-      console.error('ViciDial phone log error:', err);
-      res.status(500).json({ error: 'Failed to fetch from ViciDial', details: err.message });
+      console.error('ViciDial phone log error:', err.message);
+      res.json({ data: null, success: false, error: err.message });
     }
   }
 );
@@ -96,18 +98,16 @@ router.post(
 
       const config = await getDialerConfig();
       if (!config) {
-        return res.status(400).json({ error: 'Dialer not configured' });
+        return res.json({ data: null, success: false, error: 'Dialer not configured' });
       }
 
       const url = `${config.dialer_url}${config.api_path}?function=lead_all_info&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&lead_id=${encodeURIComponent(lead_id)}&stage=pipe&header=YES`;
 
-      const response = await fetch(url);
-      const text = await response.text();
-
-      res.json({ data: text, success: true });
+      const response = await axios.get(url, { timeout: 15000 });
+      res.json({ data: response.data, success: true });
     } catch (err) {
-      console.error('ViciDial lead info error:', err);
-      res.status(500).json({ error: 'Failed to fetch from ViciDial', details: err.message });
+      console.error('ViciDial lead info error:', err.message);
+      res.json({ data: null, success: false, error: err.message });
     }
   }
 );
@@ -126,18 +126,16 @@ router.post(
 
       const config = await getDialerConfig();
       if (!config) {
-        return res.status(400).json({ error: 'Dialer not configured' });
+        return res.json({ data: null, success: false, error: 'Dialer not configured' });
       }
 
       const url = `${config.dialer_url}${config.api_path}?function=recording_lookup&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&lead_id=${encodeURIComponent(lead_id)}&stage=pipe&header=YES`;
 
-      const response = await fetch(url);
-      const text = await response.text();
-
-      res.json({ data: text, success: true });
+      const response = await axios.get(url, { timeout: 15000 });
+      res.json({ data: response.data, success: true });
     } catch (err) {
-      console.error('ViciDial recording error:', err);
-      res.status(500).json({ error: 'Failed to fetch from ViciDial', details: err.message });
+      console.error('ViciDial recording error:', err.message);
+      res.json({ data: null, success: false, error: err.message });
     }
   }
 );
@@ -157,20 +155,21 @@ router.post(
       const path = api_path || '/vicidial/non_agent_api.php';
       const url = `${dialer_url}${path}?function=lead_search&user=${encodeURIComponent(api_user)}&pass=${encodeURIComponent(api_pass)}&source=test&phone_number=0000000000&stage=pipe&header=YES`;
 
-      const response = await fetch(url);
-      const text = await response.text();
+      const response = await axios.get(url, { timeout: 15000 });
+      const text = response.data;
+      const textStr = typeof text === 'string' ? text : JSON.stringify(text);
 
       // Check if response indicates success (ViciDial returns specific text)
-      const success = !text.includes('ERROR') && response.ok;
+      const success = !textStr.includes('ERROR');
 
-      res.json({ 
+      res.json({
         success, 
         message: success ? 'Connection successful' : 'Connection failed',
-        response: text.substring(0, 500) // First 500 chars for debugging
+        response: textStr.substring(0, 500) // First 500 chars for debugging
       });
     } catch (err) {
-      console.error('ViciDial test error:', err);
-      res.status(500).json({ 
+      console.error('ViciDial test error:', err.message);
+      res.json({ 
         success: false, 
         error: 'Failed to connect to ViciDial', 
         details: err.message 
