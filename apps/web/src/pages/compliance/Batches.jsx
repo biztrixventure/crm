@@ -10,12 +10,13 @@ export default function ComplianceBatches() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [companies, setCompanies] = useState([]);
+  const [agents, setAgents] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     company_id: '',
     date_from: '',
     date_to: '',
-    assigned_to: '',
+    assign_to: '',
   });
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function ComplianceBatches() {
     fetchBatches();
     if (isManager) {
       fetchCompanies();
+      fetchAgents();
     }
   }, []);
 
@@ -49,6 +51,15 @@ export default function ComplianceBatches() {
     }
   }
 
+  async function fetchAgents() {
+    try {
+      const res = await api.get('/users?role=compliance_agent&limit=100');
+      setAgents(res.data.users || []);
+    } catch (error) {
+      console.error('Failed to fetch agents:', error);
+    }
+  }
+
   async function handleCreateBatch(e) {
     e.preventDefault();
     if (!formData.company_id || !formData.date_from || !formData.date_to) {
@@ -58,15 +69,20 @@ export default function ComplianceBatches() {
 
     setSubmitting(true);
     try {
-      await api.post('/compliance/batches', {
+      const response = await api.post('/compliance/batches', {
         company_id: formData.company_id,
         date_from: formData.date_from,
         date_to: formData.date_to,
-        assign_to: formData.assigned_to || null,
+        assign_to: formData.assign_to || null,
       });
+
       toast.success('Batch created successfully');
+      if (formData.assign_to) {
+        const agent = agents.find(a => a.id === formData.assign_to);
+        toast.success(`Batch assigned to ${agent?.full_name}`);
+      }
       setShowCreateForm(false);
-      setFormData({ company_id: '', date_from: '', date_to: '', assigned_to: '' });
+      setFormData({ company_id: '', date_from: '', date_to: '', assign_to: '' });
       fetchBatches();
     } catch (error) {
       console.error('Failed to create batch:', error);
@@ -149,15 +165,29 @@ export default function ComplianceBatches() {
 
               <div>
                 <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
-                  Assign To (Optional)
+                  Assign Agent (Optional)
                 </label>
-                <input
-                  type="text"
-                  value={formData.assigned_to}
-                  onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                  placeholder="Agent email or ID"
+                <select
+                  value={formData.assign_to}
+                  onChange={(e) => setFormData({ ...formData, assign_to: e.target.value })}
                   className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
+                >
+                  <option value="">No assignment</option>
+                  {agents.length === 0 ? (
+                    <option disabled>No compliance agents available</option>
+                  ) : (
+                    agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.full_name} ({agent.email})
+                      </option>
+                    ))
+                  )}
+                </select>
+                {formData.assign_to && (
+                  <p className="text-xs text-primary-600 dark:text-primary-400 mt-1">
+                    ✓ Agent will be notified when batch is created
+                  </p>
+                )}
               </div>
             </div>
 
@@ -187,6 +217,7 @@ export default function ComplianceBatches() {
             <tr>
               <th className="px-6 py-4 text-left text-sm font-semibold text-primary-900 dark:text-primary-100">Company</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-primary-900 dark:text-primary-100">Date Range</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-primary-900 dark:text-primary-100">Agent</th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100">Records</th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100">Reviewed</th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100">Flagged</th>
@@ -197,7 +228,7 @@ export default function ComplianceBatches() {
           <tbody className="divide-y divide-cream-200 dark:divide-dark-600">
             {batches.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-primary-600 dark:text-primary-400">
+                <td colSpan={8} className="px-6 py-8 text-center text-primary-600 dark:text-primary-400">
                   {isManager ? 'No batches created yet' : 'No batches assigned to you'}
                 </td>
               </tr>
@@ -209,6 +240,18 @@ export default function ComplianceBatches() {
                   </td>
                   <td className="px-6 py-4 text-sm text-primary-600 dark:text-primary-400">
                     {batch.date_from} to {batch.date_to}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-primary-700 dark:text-primary-300">
+                    {batch.assigned_to_user?.full_name ? (
+                      <span className="inline-flex items-center gap-1">
+                        {batch.assigned_to_user.full_name}
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded">
+                          Assigned
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-primary-400 italic">Unassigned</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center text-sm font-bold text-primary-900 dark:text-primary-100">
                     {batch.total_records}
