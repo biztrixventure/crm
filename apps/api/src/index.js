@@ -41,6 +41,9 @@ import clientRoutes from './routes/clients.js';
 import callbackRoutes from './routes/callbacks.js';
 import numberRoutes from './routes/numbers.js';
 import auditRoutes from './routes/audit.js';
+import closerManagerRoutes from './routes/closer-manager.js';
+import operationsRoutes from './routes/operations.js';
+import complianceRoutes from './routes/compliance.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -100,6 +103,9 @@ app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/callbacks', callbackRoutes);
 app.use('/api/v1/numbers', numberRoutes);
 app.use('/api/v1/audit', auditRoutes);
+app.use('/api/v1/closer-manager', closerManagerRoutes);
+app.use('/api/v1/operations', operationsRoutes);
+app.use('/api/v1/compliance', complianceRoutes);
 
 // 404 handler
 app.use((req, res) => {

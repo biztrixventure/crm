@@ -11,8 +11,8 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
-// GET /companies - List all companies (Super Admin / Readonly Admin / Closer)
-router.get('/', roleGuard('super_admin', 'readonly_admin', 'closer'), async (req, res) => {
+// GET /companies - List all companies (Super Admin / Readonly Admin / Closer / Operations Manager / Compliance Manager)
+router.get('/', roleGuard('super_admin', 'readonly_admin', 'closer', 'operations_manager', 'compliance_manager'), async (req, res) => {
   try {
     // Get Sale Made disposition ID once (cache it)
     const { data: saleDisposition } = await supabase

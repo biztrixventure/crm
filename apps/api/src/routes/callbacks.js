@@ -23,10 +23,12 @@ router.get('/', async (req, res) => {
       .order('best_time', { ascending: true });
 
     // Role-based filtering
-    if (role === 'fronter' || role === 'closer') {
+    if (role === 'fronter' || role === 'closer' || role === 'closer_manager') {
       query = query.eq('created_by', userId);
     } else if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
+    } else if (role === 'operations_manager') {
+      // Operations manager can see all callbacks
     }
 
     // Optionally filter out fired callbacks
@@ -45,8 +47,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /callbacks - Create callback (Fronter or Closer)
-router.post('/', roleGuard('fronter', 'closer'), validate(createCallbackSchema), async (req, res) => {
+// POST /callbacks - Create callback (Fronter, Closer, or Closer Manager)
+router.post('/', roleGuard('fronter', 'closer', 'closer_manager'), validate(createCallbackSchema), async (req, res) => {
   const { id: userId, companyId } = req.user;
   const { customer_name, customer_phone, best_time, notes } = req.body;
 

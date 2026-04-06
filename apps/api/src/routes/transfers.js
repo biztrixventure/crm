@@ -36,9 +36,10 @@ router.get('/', validateQuery(transferQuerySchema), async (req, res) => {
       query = query.eq('closer_id', userId);
     } else if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
-    } else if (['super_admin', 'readonly_admin'].includes(role) && company_id) {
+    } else if (['super_admin', 'readonly_admin', 'closer_manager', 'operations_manager'].includes(role) && company_id) {
       query = query.eq('company_id', company_id);
     }
+    // closer_manager and operations_manager can see all transfers without company_id filter
 
     // Additional filters
     if (fronter_id) query = query.eq('fronter_id', fronter_id);

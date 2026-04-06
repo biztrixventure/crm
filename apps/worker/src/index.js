@@ -40,11 +40,11 @@ function connectSocket() {
 
 async function processCallbacks() {
   const now = Math.floor(Date.now() / 1000);
-  
+
   try {
     // Get all callbacks due for notification
     const dueCallbackIds = await redis.zrangebyscore('cb:queue', 0, now);
-    
+
     if (dueCallbackIds.length === 0) {
       return;
     }
@@ -121,14 +121,54 @@ async function processCallbacks() {
   }
 }
 
+async function checkComplianceBatchReminders() {
+  try {
+    // Find batches pending for 24+ hours with assigned agents
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: pendingBatches, error } = await supabase
+      .from('compliance_batches')
+      .select('id, assigned_to, created_at')
+      .eq('status', 'pending')
+      .lt('created_at', oneDayAgo)
+      .not('assigned_to', 'is', null);
+
+    if (error) {
+      console.error('Error fetching pending batches:', error);
+      return;
+    }
+
+    if (!pendingBatches || pendingBatches.length === 0) {
+      return;
+    }
+
+    console.log(`Found ${pendingBatches.length} batches pending for 24+ hours`);
+
+    // Emit reminder to each assigned agent
+    for (const batch of pendingBatches) {
+      if (socket && socket.connected) {
+        socket.emit('compliance:batch_reminder', {
+          agentId: batch.assigned_to,
+          batchId: batch.id,
+          message: 'Reminder: You have a compliance batch pending review for 24+ hours',
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`✅ Sent batch reminder to agent ${batch.assigned_to}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error in checkComplianceBatchReminders:', err);
+  }
+}
+
 async function startWorker() {
   console.log('🚀 BizTrixVenture Callback Worker starting...');
-  
+
   // Connect to Redis
   redis.on('connect', () => {
     console.log('✅ Redis connected');
   });
-  
+
   redis.on('error', (err) => {
     console.error('Redis error:', err);
   });
@@ -136,13 +176,19 @@ async function startWorker() {
   // Connect socket
   connectSocket();
 
-  // Start polling loop
-  console.log(`📡 Polling every ${POLL_INTERVAL / 1000} seconds`);
-  
+  // Start polling loop for callbacks (every 30 seconds)
+  console.log(`📡 Polling callbacks every 30 seconds`);
   setInterval(processCallbacks, POLL_INTERVAL);
-  
-  // Run immediately on start
+
+  // Start batch reminder check (every 60 minutes)
+  console.log(`📡 Checking batch reminders every 60 minutes`);
+  setInterval(checkComplianceBatchReminders, 60 * 60 * 1000);
+
+  // Run callbacks immediately on start
   await processCallbacks();
+
+  // Check batch reminders immediately on start
+  await checkComplianceBatchReminders();
 }
 
 // Handle graceful shutdown

@@ -18,6 +18,11 @@ router.get('/', async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
 
   try {
+    // Only super_admin, readonly_admin, closer_manager, operations_manager, and company_admin can view users
+    if (!['super_admin', 'readonly_admin', 'closer_manager', 'operations_manager', 'company_admin'].includes(role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     let query = supabase
       .from('users')
       .select(`
@@ -85,7 +90,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
 
   // Validate company assignment for company-scoped roles
   const companyRoles = ['company_admin', 'fronter'];
-  const biztrixRoles = ['super_admin', 'readonly_admin', 'closer'];
+  const biztrixRoles = ['super_admin', 'readonly_admin', 'closer', 'closer_manager', 'operations_manager', 'compliance_manager', 'compliance_agent'];
 
   if (companyRoles.includes(newUserRole) && !company_id) {
     return res.status(422).json({ error: 'Company ID is required for this role' });
