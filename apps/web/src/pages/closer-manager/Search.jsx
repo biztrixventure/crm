@@ -26,13 +26,15 @@ export default function CloserManagerSearch() {
       setResults(res.data.results || []);
 
       if (!res.data.results || res.data.results.length === 0) {
-        toast.info('No results found for this number');
+        toast.success('No results found for this number');
+      } else {
+        toast.success(`Found ${res.data.results.length} result(s)`);
       }
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
       if (error.response?.status === 404) {
-        toast.info('Number not found in the system');
+        toast.success('Number not found in the system');
       } else {
         toast.error(error.response?.data?.error || 'Search failed');
       }
