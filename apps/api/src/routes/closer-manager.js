@@ -434,19 +434,4 @@ router.patch('/transfers/:id/reassign', async (req, res) => {
   }
 });
 
-// ============================================================
-// SCHEMA DEFINITIONS
-// ============================================================
-
-const createCloserSchema = {
-  type: 'object',
-  required: ['email', 'full_name', 'password'],
-  properties: {
-    email: { type: 'string', format: 'email' },
-    full_name: { type: 'string', minLength: 1 },
-    password: { type: 'string', minLength: 8 },
-  },
-  additionalProperties: false,
-};
-
 export default router;
