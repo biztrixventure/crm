@@ -2,8 +2,20 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { useAuthStore } from '../../store/auth';
 
 export default function ComplianceDNC() {
+  const { user } = useAuthStore();
+  const isManager = user?.role === 'compliance_manager';
+
+  if (!isManager) {
+    return (
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-2xl p-6">
+        <p className="text-yellow-800 dark:text-yellow-300 font-medium">Access Denied</p>
+        <p className="text-yellow-700 dark:text-yellow-400 text-sm mt-1">Only compliance managers can manage the DNC list.</p>
+      </div>
+    );
+  }
   const [dncList, setDncList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [phone, setPhone] = useState('');

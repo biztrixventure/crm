@@ -1,29 +1,80 @@
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
+import { useNavigate } from 'react-router-dom';
 
 export default function ComplianceBatches() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    company_id: '',
+    date_from: '',
+    date_to: '',
+    assigned_to: '',
+  });
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const isManager = user?.role === 'compliance_manager';
 
   useEffect(() => {
-    async function fetchBatches() {
-      try {
-        const res = await api.get('/compliance/batches?limit=50');
-        setBatches(res.data.batches || []);
-      } catch (error) {
-        console.error('Failed to fetch batches:', error);
-        toast.error('Failed to load batches');
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchBatches();
+    if (isManager) {
+      fetchCompanies();
+    }
   }, []);
+
+  async function fetchBatches() {
+    try {
+      const res = await api.get('/compliance/batches?limit=50');
+      setBatches(res.data.batches || []);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+      toast.error('Failed to load batches');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchCompanies() {
+    try {
+      const res = await api.get('/companies?limit=100');
+      setCompanies(res.data.companies || []);
+    } catch (error) {
+      console.error('Failed to fetch companies:', error);
+    }
+  }
+
+  async function handleCreateBatch(e) {
+    e.preventDefault();
+    if (!formData.company_id || !formData.date_from || !formData.date_to) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post('/compliance/batches', {
+        company_id: formData.company_id,
+        date_from: formData.date_from,
+        date_to: formData.date_to,
+        assigned_to: formData.assigned_to || undefined,
+      });
+      toast.success('Batch created successfully');
+      setShowCreateForm(false);
+      setFormData({ company_id: '', date_from: '', date_to: '', assigned_to: '' });
+      fetchBatches();
+    } catch (error) {
+      console.error('Failed to create batch:', error);
+      toast.error(error.response?.data?.message || 'Failed to create batch');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -40,12 +91,95 @@ export default function ComplianceBatches() {
           {isManager ? 'Compliance Batches' : 'My Assigned Batches'}
         </h2>
         {isManager && (
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+          >
             <Plus size={18} />
             Create Batch
           </button>
         )}
       </div>
+
+      {showCreateForm && isManager && (
+        <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-lg p-6 border border-cream-200/50 dark:border-dark-700/50">
+          <form onSubmit={handleCreateBatch} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
+                  Company *
+                </label>
+                <select
+                  value={formData.company_id}
+                  onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select a company...</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.display_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
+                  From Date *
+                </label>
+                <input
+                  type="date"
+                  value={formData.date_from}
+                  onChange={(e) => setFormData({ ...formData, date_from: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
+                  To Date *
+                </label>
+                <input
+                  type="date"
+                  value={formData.date_to}
+                  onChange={(e) => setFormData({ ...formData, date_to: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary-900 dark:text-primary-100 mb-2">
+                  Assign To (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.assigned_to}
+                  onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                  placeholder="Agent email or ID"
+                  className="w-full px-4 py-2 rounded-lg border border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-900 dark:text-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              >
+                {submitting ? 'Creating...' : 'Create Batch'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(false)}
+                className="px-6 py-2 bg-cream-200 dark:bg-dark-700 text-primary-900 dark:text-primary-100 rounded-lg transition-colors hover:bg-cream-300 dark:hover:bg-dark-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-lg overflow-hidden border border-cream-200/50 dark:border-dark-700/50">
         <table className="w-full">
@@ -57,18 +191,19 @@ export default function ComplianceBatches() {
               <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100">Reviewed</th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100">Flagged</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-primary-900 dark:text-primary-100">Status</th>
+              <th className="px-6 py-4 text-center text-sm font-semibold text-primary-900 dark:text-primary-100"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-cream-200 dark:divide-dark-600">
             {batches.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-primary-600 dark:text-primary-400">
-                  No batches found
+                <td colSpan={7} className="px-6 py-8 text-center text-primary-600 dark:text-primary-400">
+                  {isManager ? 'No batches created yet' : 'No batches assigned to you'}
                 </td>
               </tr>
             ) : (
               batches.map((batch) => (
-                <tr key={batch.id} className="hover:bg-cream-50 dark:hover:bg-dark-700/50 transition-colors cursor-pointer">
+                <tr key={batch.id} className="hover:bg-cream-50 dark:hover:bg-dark-700/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-primary-900 dark:text-primary-100">
                     {batch.company?.display_name || 'N/A'}
                   </td>
@@ -94,6 +229,14 @@ export default function ComplianceBatches() {
                     }`}>
                       {batch.status === 'in_progress' ? 'In Progress' : batch.status === 'completed' ? 'Completed' : 'Pending'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => navigate(`/compliance/batches/${batch.id}`)}
+                      className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                    </button>
                   </td>
                 </tr>
               ))

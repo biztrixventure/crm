@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth';
 // Sub-pages
 import ComplianceBatches from './compliance/Batches';
 import ComplianceRecords from './compliance/Records';
+import ComplianceBatchDetail from './compliance/BatchDetail';
 import ComplianceDNC from './compliance/DNC';
 
 function StatCard({ title, value, icon: Icon, color = 'primary' }) {
@@ -141,6 +142,7 @@ export default function ComplianceDashboard() {
       ) : (
         <Routes>
           <Route path="/batches/*" element={<ComplianceBatches />} />
+          <Route path="/batches/:batchId" element={<ComplianceBatchDetail />} />
           <Route path="/records" element={<ComplianceRecords />} />
           <Route path="/dnc" element={<ComplianceDNC />} />
         </Routes>
