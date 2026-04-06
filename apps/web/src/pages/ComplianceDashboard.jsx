@@ -11,6 +11,7 @@ import ComplianceBatches from './compliance/Batches';
 import ComplianceRecords from './compliance/Records';
 import ComplianceBatchDetail from './compliance/BatchDetail';
 import ComplianceDNC from './compliance/DNC';
+import CreateAgent from './compliance/CreateAgent';
 
 function StatCard({ title, value, icon: Icon, color = 'primary' }) {
   const colors = {
@@ -90,7 +91,7 @@ function Overview() {
       {isManager && (
         <div className="bg-white dark:bg-dark-800 rounded-2xl p-8 shadow-lg border border-cream-200/50 dark:border-dark-700/50">
           <h2 className="text-2xl font-bold text-primary-900 dark:text-primary-100 mb-6">Manager Tools</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Link to="/compliance/batches" className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow">
               <FileText className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
               <p className="font-medium text-primary-900 dark:text-primary-100">Manage Batches</p>
@@ -102,6 +103,10 @@ function Overview() {
             <Link to="/compliance/dnc" className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow">
               <Shield className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
               <p className="font-medium text-primary-900 dark:text-primary-100">DNC List</p>
+            </Link>
+            <Link to="/compliance/create-agent" className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow">
+              <Shield className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
+              <p className="font-medium text-primary-900 dark:text-primary-100">Create Agent</p>
             </Link>
           </div>
         </div>
@@ -145,6 +150,7 @@ export default function ComplianceDashboard() {
           <Route path="/batches/:batchId" element={<ComplianceBatchDetail />} />
           <Route path="/records" element={<ComplianceRecords />} />
           <Route path="/dnc" element={<ComplianceDNC />} />
+          <Route path="/create-agent" element={<CreateAgent />} />
         </Routes>
       )}
     </div>

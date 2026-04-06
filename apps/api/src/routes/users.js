@@ -84,6 +84,15 @@ router.post('/', validate(createUserSchema), async (req, res) => {
     if (company_id && company_id !== creatorCompanyId) {
       return res.status(403).json({ error: 'Cannot create users for other companies' });
     }
+  } else if (creatorRole === 'compliance_manager') {
+    // Compliance managers can only create compliance agents
+    if (newUserRole !== 'compliance_agent') {
+      return res.status(403).json({ error: 'Compliance managers can only create compliance agent accounts' });
+    }
+    // Compliance agents should not be assigned to a company (BizTrix internal only)
+    if (company_id) {
+      return res.status(422).json({ error: 'Compliance agents are BizTrix-internal and cannot be assigned to companies' });
+    }
   } else if (creatorRole !== 'super_admin') {
     return res.status(403).json({ error: 'Not authorized to create users' });
   }
