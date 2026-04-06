@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
-import { Users, TrendingUp, Phone, Plus, Loader2 } from 'lucide-react';
+import { Users, TrendingUp, Phone, Plus, Loader2, SearchIcon, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 // Sub-pages
 import CloserManagerClosers from './closer-manager/Closers';
 import CloserManagerPerformance from './closer-manager/Performance';
 import CloserManagerTransfers from './closer-manager/Transfers';
+import CloserManagerRecord from './closer-manager/Record';
+import CloserManagerSearch from './closer-manager/Search';
+import CloserManagerCallbacks from './closer-manager/Callbacks';
 
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
   const colors = {
@@ -86,22 +89,30 @@ function Overview() {
 
       <div className="bg-white dark:bg-dark-800 rounded-2xl p-8 shadow-lg border border-cream-200/50 dark:border-dark-700/50">
         <h2 className="text-2xl font-bold text-primary-900 dark:text-primary-100 mb-6">Quick Links</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <Link to="/closer-manager/closers" className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow">
             <Users className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
-            <p className="font-medium text-primary-900 dark:text-primary-100">Manage Closers</p>
+            <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Manage Closers</p>
           </Link>
           <Link to="/closer-manager/performance" className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 hover:shadow-lg transition-shadow">
             <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400 mb-2" />
-            <p className="font-medium text-green-900 dark:text-green-100">View Performance</p>
+            <p className="font-medium text-green-900 dark:text-green-100 text-sm">Performance</p>
           </Link>
           <Link to="/closer-manager/transfers" className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:shadow-lg transition-shadow">
             <Phone className="w-6 h-6 text-blue-600 dark:text-blue-400 mb-2" />
-            <p className="font-medium text-blue-900 dark:text-blue-100">All Transfers</p>
+            <p className="font-medium text-blue-900 dark:text-blue-100 text-sm">Transfers</p>
           </Link>
           <Link to="/closer-manager/records" className="p-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 hover:shadow-lg transition-shadow">
             <Plus className="w-6 h-6 text-accent-600 dark:text-accent-400 mb-2" />
-            <p className="font-medium text-accent-900 dark:text-accent-100">My Records</p>
+            <p className="font-medium text-accent-900 dark:text-accent-100 text-sm">My Records</p>
+          </Link>
+          <Link to="/closer-manager/search" className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 hover:shadow-lg transition-shadow">
+            <SearchIcon className="w-6 h-6 text-purple-600 dark:text-purple-400 mb-2" />
+            <p className="font-medium text-purple-900 dark:text-purple-100 text-sm">Search</p>
+          </Link>
+          <Link to="/closer-manager/callbacks" className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 hover:shadow-lg transition-shadow">
+            <Clock className="w-6 h-6 text-orange-600 dark:text-orange-400 mb-2" />
+            <p className="font-medium text-orange-900 dark:text-orange-100 text-sm">Callbacks</p>
           </Link>
         </div>
       </div>
@@ -127,6 +138,9 @@ export default function CloserManagerDashboard() {
           <Route path="/closers" element={<CloserManagerClosers />} />
           <Route path="/performance" element={<CloserManagerPerformance />} />
           <Route path="/transfers" element={<CloserManagerTransfers />} />
+          <Route path="/records" element={<CloserManagerRecord />} />
+          <Route path="/search" element={<CloserManagerSearch />} />
+          <Route path="/callbacks" element={<CloserManagerCallbacks />} />
         </Routes>
       )}
     </div>

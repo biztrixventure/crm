@@ -16,7 +16,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from 'lucide-animated';
-import { Building2, Phone, FileText, TrendingUp } from 'lucide-react';
+import { Building2, Phone, FileText, TrendingUp, SearchIcon } from 'lucide-react';
 import { useState } from 'react';
 import { cn, roleLabels, getInitials } from '../lib/utils';
 
@@ -52,10 +52,11 @@ const navigation = {
   closer_manager: [
     { name: 'Dashboard', href: '/closer-manager', icon: HomeIcon },
     { name: 'My Records', href: '/closer-manager/records', icon: FileText },
+    { name: 'Callbacks', href: '/closer-manager/callbacks', icon: Phone },
+    { name: 'Number Search', href: '/closer-manager/search', icon: SearchIcon },
     { name: 'Closers', href: '/closer-manager/closers', icon: UsersIcon },
     { name: 'Performance', href: '/closer-manager/performance', icon: TrendingUp },
     { name: 'Transfers', href: '/closer-manager/transfers', icon: Phone },
-    { name: 'Callbacks', href: '/closer-manager/callbacks', icon: Phone },
   ],
   operations_manager: [
     { name: 'Dashboard', href: '/operations', icon: HomeIcon },
