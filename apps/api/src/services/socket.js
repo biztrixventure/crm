@@ -4,12 +4,27 @@ import { getRedis, isRedisConnected } from './redis.js';
 let io = null;
 
 export function initSocket(httpServer) {
+  // Determine CORS origin - support multiple formats
+  let corsOrigin = 'http://localhost:5173';
+
+  if (process.env.FRONTEND_URL) {
+    corsOrigin = process.env.FRONTEND_URL === '*' ? true : process.env.FRONTEND_URL;
+  } else if (process.env.NODE_ENV === 'production') {
+    // In production without explicit FRONTEND_URL, allow all origins
+    // (relies on socket.io connection with proper credentials)
+    corsOrigin = true;
+  }
+
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL === '*' ? true : (process.env.FRONTEND_URL || 'http://localhost:5173'),
+      origin: corsOrigin,
       credentials: true,
+      methods: ['GET', 'POST'],
     },
+    allowEIO3: true,
     transports: ['websocket', 'polling'],
+    pingInterval: 30000,
+    pingTimeout: 60000,
   });
 
   // Redis adapter setup deferred - works without it for single instance

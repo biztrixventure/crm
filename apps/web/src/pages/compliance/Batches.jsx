@@ -62,7 +62,7 @@ export default function ComplianceBatches() {
         company_id: formData.company_id,
         date_from: formData.date_from,
         date_to: formData.date_to,
-        assigned_to: formData.assigned_to || undefined,
+        assign_to: formData.assigned_to || null,
       });
       toast.success('Batch created successfully');
       setShowCreateForm(false);
