@@ -12,15 +12,23 @@ import CloserRecordForm from '../components/CloserRecordForm';
 
 // Number Search component
 function NumberSearch() {
-  const { query, result, isLoading, error, handleQueryChange, clearSearch, submitSearch } = useSearch();
+  const { query, result, isLoading, error, handleQueryChange, clearSearch, submitSearch, dialerConfig } = useSearch();
   const [showNewPolicy, setShowNewPolicy] = useState(false);
+  const [showVicidial, setShowVicidial] = useState(false);
 
   return (
     <>
       <div className="bg-white dark:bg-dark-900 rounded-2xl p-6 shadow-lg border border-cream-200/50 dark:border-dark-800/60">
-        <h2 className="text-lg font-semibold text-primary-800 dark:text-primary-200 mb-4">
-          Number Search
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-primary-800 dark:text-primary-200">
+            Number Search
+          </h2>
+          {dialerConfig?.is_active && (
+            <span className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+              Dialer Connected
+            </span>
+          )}
+        </div>
         
         <div className="relative">
           <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
@@ -54,45 +62,115 @@ function NumberSearch() {
           )}
 
         {result && (
-          <div className={cn(
-            'mt-4 p-4 rounded-lg flex items-center justify-between',
-            result.sold
-              ? 'bg-red-50 dark:bg-red-900/50'
-              : 'bg-green-50 dark:bg-green-900/50'
-          )}>
-            <div className="flex items-center gap-3">
-              {result.sold ? (
-                <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-              ) : (
-                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-              )}
-              <div>
-                <p className={cn(
-                  'font-semibold',
-                  result.sold
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-green-600 dark:text-green-400'
-                )}>
-                  {result.sold ? 'SOLD' : 'NOT SOLD'}
-                </p>
-                  <p className="text-sm text-primary-500 dark:text-primary-400">
-                    {result.phone}
+          <>
+            <div className={cn(
+              'mt-4 p-4 rounded-lg flex items-center justify-between',
+              result.sold
+                ? 'bg-red-50 dark:bg-red-900/50'
+                : 'bg-green-50 dark:bg-green-900/50'
+            )}>
+              <div className="flex items-center gap-3">
+                {result.sold ? (
+                  <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                ) : (
+                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                )}
+                <div>
+                  <p className={cn(
+                    'font-semibold',
+                    result.sold
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-green-600 dark:text-green-400'
+                  )}>
+                    {result.sold ? 'SOLD' : 'NOT SOLD'}
                   </p>
-                  <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
-                    Source: {result.source === 'cache' ? 'Redis cache' : 'Database'}
-                  </p>
+                    <p className="text-sm text-primary-500 dark:text-primary-400">
+                      {result.phone}
+                    </p>
+                    <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
+                      CRM: {result.total_policies || 0} policies
+                      {result.vicidial_available && ` • Dialer: ${result.vicidial?.call_history?.length || 0} calls`}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-            {result.sold && (
-              <button
-                onClick={() => setShowNewPolicy(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition"
-              >
-                <Plus size={18} /> New Policy
-              </button>
+              <div className="flex items-center gap-2">
+                {result.vicidial_available && (
+                  <button
+                    onClick={() => setShowVicidial(!showVicidial)}
+                    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium transition"
+                  >
+                    {showVicidial ? 'Hide' : 'Show'} Dialer Data
+                  </button>
+                )}
+                {result.sold && (
+                  <button
+                    onClick={() => setShowNewPolicy(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition"
+                  >
+                    <Plus size={18} /> New Policy
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ViciDial Data Panel */}
+            {showVicidial && result.vicidial_available && result.vicidial && (
+              <div className="mt-4 space-y-4">
+                {/* Lead Info */}
+                {result.vicidial.lead_info && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Lead Information</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      {Object.entries(result.vicidial.lead_info).map(([key, value]) => (
+                        value && key !== 'password' && (
+                          <div key={key}>
+                            <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">{key.replace(/_/g, ' ')}</span>
+                            <p className="text-blue-900 dark:text-blue-100 font-medium truncate">{value}</p>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Call History */}
+                {result.vicidial.call_history?.length > 0 && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border border-gray-200 dark:border-gray-800">
+                    <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                      Call History ({result.vicidial.call_history.length} calls)
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
+                            <th className="pb-2">Date</th>
+                            <th className="pb-2">Duration</th>
+                            <th className="pb-2">Agent</th>
+                            <th className="pb-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {result.vicidial.call_history.slice(0, 20).map((call, i) => (
+                            <tr key={i} className="text-gray-700 dark:text-gray-300">
+                              <td className="py-2">{call.call_date || call.date || '-'}</td>
+                              <td className="py-2">{call.length_in_sec || call.duration || '-'}s</td>
+                              <td className="py-2">{call.user || call.agent || '-'}</td>
+                              <td className="py-2">
+                                <span className="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700">
+                                  {call.status || call.disposition || '-'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {(query || result || error) && (

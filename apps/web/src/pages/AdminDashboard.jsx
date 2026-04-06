@@ -9,7 +9,7 @@ import {
 import { Building2, DollarSign, Plus, Star, Phone, Loader2, ShieldCheck, Activity, Save } from 'lucide-react';
 import { formatDateTime, cn } from '../lib/utils';
 import { useAuthStore } from '../store/auth';
-import { Companies, Users } from './admin';
+import { Companies, Users, DialerSettings } from './admin';
 import PlanManager from '../components/PlanManager';
 import ClientManager from '../components/ClientManager';
 import SearchFieldConfig from '../components/SearchFieldConfig';
@@ -540,6 +540,7 @@ export default function AdminDashboard() {
       <Route path="plans/*" element={<PlanManager />} />
       <Route path="clients/*" element={<ClientManager />} />
       <Route path="search-config/*" element={<SearchFieldConfig />} />
+      <Route path="dialer/*" element={<DialerSettings />} />
       <Route path="audit/*" element={<AuditLog />} />
     </Routes>
   );

@@ -16,7 +16,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from 'lucide-animated';
-import { Building2, Phone, FileText } from 'lucide-react';
+import { Building2, Phone, FileText, Headphones } from 'lucide-react';
 import { useState } from 'react';
 import { cn, roleLabels, getInitials } from '../lib/utils';
 
@@ -29,6 +29,7 @@ const navigation = {
     { name: 'Plans', href: '/admin/plans', icon: FileText },
     { name: 'Clients', href: '/admin/clients', icon: FileText },
     { name: 'Search Config', href: '/admin/search-config', icon: SettingsIcon },
+    { name: 'Dialer Settings', href: '/admin/dialer', icon: Headphones },
     { name: 'Audit Log', href: '/admin/audit', icon: FileText },
   ],
   readonly_admin: [
