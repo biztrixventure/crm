@@ -189,11 +189,15 @@ export function useSearch() {
     fetchDialerConfig();
   }, []);
 
-  // Fetch from ViciDial via server proxy (bypasses CORS)
+  // Fetch from ViciDial directly from browser (client-side)
+  // Config comes from server, but API calls are made from user's browser
   async function fetchViciDial(phoneDigits) {
-    if (!dialerConfig?.is_active) {
+    if (!dialerConfig?.is_active || !dialerConfig?.dialer_url) {
       return null;
     }
+
+    const baseUrl = `${dialerConfig.dialer_url}${dialerConfig.api_path || '/vicidial/non_agent_api.php'}`;
+    const authParams = `user=${encodeURIComponent(dialerConfig.api_user)}&pass=${encodeURIComponent(dialerConfig.api_pass)}&source=test&stage=pipe&header=YES`;
 
     let leadId = null;
     let leadInfo = null;
@@ -202,32 +206,33 @@ export function useSearch() {
     const errors = [];
 
     try {
-      // API 1: Lead Search by Phone → get lead_id (via server proxy)
-      const leadSearchRes = await api.post('/vicidial-proxy/lead-search', { 
-        phone_number: phoneDigits 
-      });
+      // API 1: Lead Search by Phone → get lead_id (direct browser request)
+      const leadSearchUrl = `${baseUrl}?function=lead_search&${authParams}&phone_number=${phoneDigits}`;
+      console.log('Fetching lead search:', leadSearchUrl);
       
-      console.log('Lead search response:', leadSearchRes.data);
+      const leadSearchRes = await fetch(leadSearchUrl);
+      const leadSearchText = await leadSearchRes.text();
+      console.log('Lead search response:', leadSearchText);
       
-      if (leadSearchRes.data.success && leadSearchRes.data.data) {
-        const leadSearchData = parseViciDialResponse(leadSearchRes.data.data);
-        console.log('Parsed lead search:', leadSearchData);
-        if (leadSearchData.data?.length > 0) {
-          leadId = leadSearchData.data[0]?.lead_id;
-          console.log('Found lead_id:', leadId);
-        }
+      const leadSearchData = parseViciDialResponse(leadSearchText);
+      console.log('Parsed lead search:', leadSearchData);
+      
+      if (leadSearchData.data?.length > 0) {
+        leadId = leadSearchData.data[0]?.lead_id;
+        console.log('Found lead_id:', leadId);
       }
 
       // API 1b: Lead All Info (if we have lead_id)
       if (leadId) {
-        const leadInfoRes = await api.post('/vicidial-proxy/lead-info', { 
-          lead_id: leadId 
-        });
-        console.log('Lead info response:', leadInfoRes.data);
-        if (leadInfoRes.data.success && leadInfoRes.data.data) {
-          leadInfo = parseLeadAllInfo(leadInfoRes.data.data);
-          console.log('Parsed lead info:', leadInfo);
-        }
+        const leadInfoUrl = `${baseUrl}?function=lead_all_info&${authParams}&lead_id=${leadId}`;
+        console.log('Fetching lead info:', leadInfoUrl);
+        
+        const leadInfoRes = await fetch(leadInfoUrl);
+        const leadInfoText = await leadInfoRes.text();
+        console.log('Lead info response:', leadInfoText);
+        
+        leadInfo = parseLeadAllInfo(leadInfoText);
+        console.log('Parsed lead info:', leadInfo);
       }
     } catch (err) {
       console.error('ViciDial lead search error:', err);
@@ -236,15 +241,16 @@ export function useSearch() {
 
     try {
       // API 2: Phone Number Log (call history) - CRITICAL for disposition
-      const callLogRes = await api.post('/vicidial-proxy/phone-log', { 
-        phone_number: phoneDigits 
-      });
-      console.log('Call log response:', callLogRes.data);
-      if (callLogRes.data.success && callLogRes.data.data) {
-        const callLogData = parseViciDialResponse(callLogRes.data.data);
-        console.log('Parsed call log:', callLogData);
-        callHistory = callLogData.data || [];
-      }
+      const callLogUrl = `${baseUrl}?function=phone_number_log&${authParams}&phone_number=${phoneDigits}&type=ALL`;
+      console.log('Fetching call log:', callLogUrl);
+      
+      const callLogRes = await fetch(callLogUrl);
+      const callLogText = await callLogRes.text();
+      console.log('Call log response:', callLogText);
+      
+      const callLogData = parseViciDialResponse(callLogText);
+      console.log('Parsed call log:', callLogData);
+      callHistory = callLogData.data || [];
     } catch (err) {
       console.error('ViciDial call log error:', err);
       errors.push('phone_number_log');
@@ -253,14 +259,15 @@ export function useSearch() {
     try {
       // API 3: Recording Lookup (if we have lead_id)
       if (leadId) {
-        const recordingRes = await api.post('/vicidial-proxy/recording', { 
-          lead_id: leadId 
-        });
-        console.log('Recording response:', recordingRes.data);
-        if (recordingRes.data.success && recordingRes.data.data) {
-          const recordingData = parseViciDialResponse(recordingRes.data.data);
-          recordings = recordingData.data || [];
-        }
+        const recordingUrl = `${baseUrl}?function=recording_lookup&${authParams}&lead_id=${leadId}`;
+        console.log('Fetching recording:', recordingUrl);
+        
+        const recordingRes = await fetch(recordingUrl);
+        const recordingText = await recordingRes.text();
+        console.log('Recording response:', recordingText);
+        
+        const recordingData = parseViciDialResponse(recordingText);
+        recordings = recordingData.data || [];
       }
     } catch (err) {
       console.error('ViciDial recording lookup error:', err);

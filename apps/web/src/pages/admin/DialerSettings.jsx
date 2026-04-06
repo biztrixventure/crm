@@ -65,28 +65,27 @@ export default function DialerSettings() {
     setTestResult(null);
 
     try {
-      // Use server proxy to test connection (avoids CORS)
-      const response = await api.post('/vicidial-proxy/test', {
-        dialer_url: config.dialer_url,
-        api_user: config.api_user,
-        api_pass: config.api_pass,
-        api_path: config.api_path || '/vicidial/non_agent_api.php',
-      });
+      // Test directly from browser (client-side) since ViciDial may not be reachable from server
+      const apiPath = config.api_path || '/vicidial/non_agent_api.php';
+      const testUrl = `${config.dialer_url}${apiPath}?function=lead_search&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&phone_number=0000000000&stage=pipe&header=YES`;
       
-      if (response.data.success) {
-        setTestResult({ success: true, message: 'Connection successful! API is responding.' });
+      console.log('Testing dialer URL:', testUrl);
+      const response = await fetch(testUrl);
+      const text = await response.text();
+      console.log('Test response:', text);
+      
+      if (text.includes('ERROR')) {
+        setTestResult({ success: false, message: `API Error: ${text}` });
+      } else if (response.ok) {
+        setTestResult({ success: true, message: 'Connection successful! API is responding from your browser.' });
       } else {
-        setTestResult({ 
-          success: false, 
-          message: response.data.message || 'Connection failed',
-          details: response.data.response 
-        });
+        setTestResult({ success: false, message: `HTTP ${response.status}: ${text}` });
       }
     } catch (error) {
       console.error('Dialer test error:', error);
       setTestResult({ 
         success: false, 
-        message: `Connection failed: ${error.response?.data?.details || error.message}`
+        message: `Connection failed: ${error.message}. Make sure your network can reach the dialer server.`
       });
     } finally {
       setTesting(false);
@@ -124,14 +123,15 @@ export default function DialerSettings() {
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
         <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800 dark:text-blue-200">
-            <p className="font-medium">Server-Side Proxy</p>
-            <p className="mt-1 text-blue-700 dark:text-blue-300">
-              API calls to ViciDial are proxied through our server to bypass CORS restrictions. 
-              The credentials are stored securely and never exposed to the browser.
+          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 dark:text-amber-200">
+            <p className="font-medium">Client-Side API Calls</p>
+            <p className="mt-1 text-amber-700 dark:text-amber-300">
+              API calls to ViciDial are made directly from the user's browser (not the server). 
+              This allows closers on whitelisted networks to access the dialer. 
+              Credentials are fetched from the server but API calls happen from the user's device.
             </p>
           </div>
         </div>
