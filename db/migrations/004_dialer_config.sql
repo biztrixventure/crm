@@ -15,9 +15,9 @@ CREATE TABLE IF NOT EXISTS dialer_config (
   updated_by    uuid REFERENCES users(id)
 );
 
--- Insert default row (super_admin will update)
+-- Insert pre-configured row with wavetechnew.i5.tel
 INSERT INTO dialer_config (dialer_url, api_user, api_pass, api_path, is_active)
-VALUES ('', '', '', '/vicidial/non_agent_api.php', false);
+VALUES ('http://wavetechnew.i5.tel', 'apiuser', 'apiuser123', '/vicidial/non_agent_api.php', true);
 
 -- Enable RLS (then disable for service role access)
 ALTER TABLE dialer_config ENABLE ROW LEVEL SECURITY;

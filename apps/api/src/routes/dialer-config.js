@@ -19,7 +19,15 @@ router.get(
         .select('*')
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      // Handle table not existing or no rows
+      if (error) {
+        // PGRST116 = no rows, 42P01 = table doesn't exist
+        if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('does not exist')) {
+          return res.json({
+            config: null,
+            message: 'Dialer not configured',
+          });
+        }
         throw error;
       }
 
@@ -30,9 +38,7 @@ router.get(
         });
       }
 
-      // For non-super_admin, return full config (needed for client-side calls)
-      // Note: credentials are intentionally exposed to closer's browser since
-      // the API calls must be made from client-side due to server restrictions
+      // Return full config (needed for client-side calls)
       res.json({
         config: {
           dialer_url: data.dialer_url,
@@ -45,7 +51,11 @@ router.get(
       });
     } catch (err) {
       console.error('Get dialer config error:', err);
-      res.status(500).json({ error: 'Failed to fetch dialer config' });
+      // Return null config instead of 500 so frontend doesn't break
+      res.json({
+        config: null,
+        message: 'Dialer config unavailable',
+      });
     }
   }
 );
