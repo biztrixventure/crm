@@ -61,6 +61,57 @@ async function canAccessCompany(managerId, companyId) {
 }
 
 // ============================================================
+// SCHEMAS
+// ============================================================
+
+const createBatchSchema = {
+  type: 'object',
+  required: ['company_id', 'date_from', 'date_to'],
+  properties: {
+    company_id: { type: 'string' },
+    date_from: { type: 'string', format: 'date' },
+    date_to: { type: 'string', format: 'date' },
+    assign_to: { type: 'string' }, // optional: compliance_agent_id
+  },
+  additionalProperties: false,
+};
+
+const submitReviewSchema = {
+  type: 'object',
+  required: ['batch_id', 'closer_record_id', 'review_status'],
+  properties: {
+    batch_id: { type: 'string' },
+    closer_record_id: { type: 'string' },
+    review_status: {
+      enum: ['approved', 'issue_found', 'pending'],
+    },
+    flag_reason: {
+      enum: [
+        'Wrong VIN',
+        'Wrong Reference No',
+        'Wrong Plan',
+        'Missing Info',
+        'Duplicate',
+        'Other',
+      ],
+    },
+    flag_notes: { type: 'string' },
+  },
+  additionalProperties: false,
+};
+
+const addDncSchema = {
+  type: 'object',
+  required: ['phone_number'],
+  properties: {
+    phone_number: { type: 'string' },
+    reason: { type: 'string' },
+    notes: { type: 'string' },
+  },
+  additionalProperties: false,
+};
+
+// ============================================================
 // CLOSER RECORDS (read-only for compliance)
 // ============================================================
 
@@ -761,56 +812,5 @@ function normalizePhoneE164(phone) {
   const digits = phone.replace(/\D/g, '');
   return digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
 }
-
-// ============================================================
-// SCHEMAS
-// ============================================================
-
-const createBatchSchema = {
-  type: 'object',
-  required: ['company_id', 'date_from', 'date_to'],
-  properties: {
-    company_id: { type: 'string' },
-    date_from: { type: 'string', format: 'date' },
-    date_to: { type: 'string', format: 'date' },
-    assign_to: { type: 'string' }, // optional: compliance_agent_id
-  },
-  additionalProperties: false,
-};
-
-const submitReviewSchema = {
-  type: 'object',
-  required: ['batch_id', 'closer_record_id', 'review_status'],
-  properties: {
-    batch_id: { type: 'string' },
-    closer_record_id: { type: 'string' },
-    review_status: {
-      enum: ['approved', 'issue_found', 'pending'],
-    },
-    flag_reason: {
-      enum: [
-        'Wrong VIN',
-        'Wrong Reference No',
-        'Wrong Plan',
-        'Missing Info',
-        'Duplicate',
-        'Other',
-      ],
-    },
-    flag_notes: { type: 'string' },
-  },
-  additionalProperties: false,
-};
-
-const addDncSchema = {
-  type: 'object',
-  required: ['phone_number'],
-  properties: {
-    phone_number: { type: 'string' },
-    reason: { type: 'string' },
-    notes: { type: 'string' },
-  },
-  additionalProperties: false,
-};
 
 export default router;
