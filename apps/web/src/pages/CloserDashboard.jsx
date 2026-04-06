@@ -16,6 +16,10 @@ function NumberSearch() {
   const [showNewPolicy, setShowNewPolicy] = useState(false);
   const [showVicidial, setShowVicidial] = useState(false);
 
+  // Get normalized ViciDial data
+  const vd = result?.vicidial?.normalized;
+  const vdRaw = result?.vicidial?.raw;
+
   return (
     <>
       <div className="bg-white dark:bg-dark-900 rounded-2xl p-6 shadow-lg border border-cream-200/50 dark:border-dark-800/60">
@@ -89,7 +93,7 @@ function NumberSearch() {
                     </p>
                     <p className="text-xs text-primary-500 dark:text-primary-400 mt-0.5">
                       CRM: {result.total_policies || 0} policies
-                      {result.vicidial_available && ` • Dialer: ${result.vicidial?.call_history?.length || 0} calls`}
+                      {result.vicidial_available && ` • Dialer: ${vdRaw?.call_history?.length || 0} calls`}
                     </p>
                   </div>
                 </div>
@@ -114,31 +118,103 @@ function NumberSearch() {
               </div>
             </div>
 
-            {/* ViciDial Data Panel */}
-            {showVicidial && result.vicidial_available && result.vicidial && (
+            {/* ViciDial Data Panel - Normalized */}
+            {showVicidial && result.vicidial_available && vd && (
               <div className="mt-4 space-y-4">
-                {/* Lead Info */}
-                {result.vicidial.lead_info && (
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Lead Information</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                      {Object.entries(result.vicidial.lead_info).map(([key, value]) => (
-                        value && key !== 'password' && (
-                          <div key={key}>
-                            <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">{key.replace(/_/g, ' ')}</span>
-                            <p className="text-blue-900 dark:text-blue-100 font-medium truncate">{value}</p>
-                          </div>
-                        )
-                      ))}
+                {/* Lead Info Card */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Lead Information</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                    {vd.full_name && (
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Full Name</span>
+                        <p className="text-blue-900 dark:text-blue-100 font-medium">{vd.full_name}</p>
+                      </div>
+                    )}
+                    {vd.phone && (
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Phone</span>
+                        <p className="text-blue-900 dark:text-blue-100 font-medium">{vd.phone}</p>
+                      </div>
+                    )}
+                    {vd.email && (
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Email</span>
+                        <p className="text-blue-900 dark:text-blue-100 font-medium truncate">{vd.email}</p>
+                      </div>
+                    )}
+                    {vd.address && (
+                      <div className="md:col-span-2">
+                        <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Address</span>
+                        <p className="text-blue-900 dark:text-blue-100 font-medium">{vd.address}</p>
+                      </div>
+                    )}
+                    {vd.agent && (
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Agent</span>
+                        <p className="text-blue-900 dark:text-blue-100 font-medium">{vd.agent}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vehicle Info */}
+                  {vd.vehicle && (vd.vehicle.year || vd.vehicle.make || vd.vehicle.model) && (
+                    <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700">
+                      <span className="text-blue-600 dark:text-blue-400 text-xs uppercase">Vehicle</span>
+                      <p className="text-blue-900 dark:text-blue-100 font-medium">
+                        {[vd.vehicle.year, vd.vehicle.make, vd.vehicle.model].filter(Boolean).join(' ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Call Details Card - TRUST THIS FOR DISPOSITION */}
+                {vd.call_details && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-3">
+                      Latest Call (Disposition Source)
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-amber-600 dark:text-amber-400 text-xs uppercase">Call Date</span>
+                        <p className="text-amber-900 dark:text-amber-100 font-medium">{vd.call_details.call_date || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-amber-600 dark:text-amber-400 text-xs uppercase">Duration</span>
+                        <p className="text-amber-900 dark:text-amber-100 font-medium">{vd.call_details.duration_seconds}s</p>
+                      </div>
+                      <div>
+                        <span className="text-amber-600 dark:text-amber-400 text-xs uppercase">Disposition</span>
+                        <p className="text-amber-900 dark:text-amber-100 font-bold">{vd.call_details.disposition || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-amber-600 dark:text-amber-400 text-xs uppercase">Hangup</span>
+                        <p className="text-amber-900 dark:text-amber-100 font-medium">{vd.call_details.hangup || '-'}</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Call History */}
-                {result.vicidial.call_history?.length > 0 && (
+                {/* Recording */}
+                {vd.recording && (
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">Recording</h4>
+                    <a 
+                      href={vd.recording} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-green-700 dark:text-green-300 hover:underline text-sm break-all"
+                    >
+                      {vd.recording}
+                    </a>
+                  </div>
+                )}
+
+                {/* Raw Call History Table */}
+                {vdRaw?.call_history?.length > 0 && (
                   <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border border-gray-200 dark:border-gray-800">
                     <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                      Call History ({result.vicidial.call_history.length} calls)
+                      All Calls ({vdRaw.call_history.length})
                     </h4>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
@@ -148,19 +224,21 @@ function NumberSearch() {
                             <th className="pb-2">Duration</th>
                             <th className="pb-2">Agent</th>
                             <th className="pb-2">Status</th>
+                            <th className="pb-2">Hangup</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                          {result.vicidial.call_history.slice(0, 20).map((call, i) => (
+                          {vdRaw.call_history.slice(0, 20).map((call, i) => (
                             <tr key={i} className="text-gray-700 dark:text-gray-300">
-                              <td className="py-2">{call.call_date || call.date || '-'}</td>
-                              <td className="py-2">{call.length_in_sec || call.duration || '-'}s</td>
-                              <td className="py-2">{call.user || call.agent || '-'}</td>
+                              <td className="py-2">{call.call_date || '-'}</td>
+                              <td className="py-2">{call.length_in_sec || '-'}s</td>
+                              <td className="py-2">{call.user || '-'}</td>
                               <td className="py-2">
                                 <span className="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700">
-                                  {call.status || call.disposition || '-'}
+                                  {call.lead_status || call.status || '-'}
                                 </span>
                               </td>
+                              <td className="py-2">{call.hangup_reason || '-'}</td>
                             </tr>
                           ))}
                         </tbody>

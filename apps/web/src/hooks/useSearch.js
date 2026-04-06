@@ -29,6 +29,141 @@ function parseViciDialResponse(text, hasHeader = true) {
   return { error: null, data: lines };
 }
 
+// Parse lead_all_info response by field index (API 1)
+// Field indices as per ViciDial spec
+function parseLeadAllInfo(text) {
+  if (!text || text.includes('ERROR')) {
+    return null;
+  }
+  
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return null;
+  
+  // First line is headers, second line is data
+  const values = lines[1]?.split('|') || [];
+  
+  return {
+    status: values[0]?.trim() || '',        // Index 0 - Lead status (can be outdated)
+    user: values[1]?.trim() || '',          // Index 1 - Agent ID
+    list_id: values[4]?.trim() || '',       // Index 4 - Campaign/List
+    phone_code: values[6]?.trim() || '',    // Index 6 - Country code
+    phone_number: values[7]?.trim() || '',  // Index 7 - Customer phone
+    first_name: values[9]?.trim() || '',    // Index 9 - First name
+    last_name: values[11]?.trim() || '',    // Index 11 - Last name
+    address1: values[12]?.trim() || '',     // Index 12 - Street address
+    address2: values[13]?.trim() || '',     // Index 13 - Make (vehicle)
+    address3: values[14]?.trim() || '',     // Index 14 - Model (vehicle)
+    city: values[15]?.trim() || '',         // Index 15 - City
+    state: values[16]?.trim() || '',        // Index 16 - State (may contain year)
+    postal_code: values[18]?.trim() || '',  // Index 18 - ZIP
+    country_code: values[19]?.trim() || '', // Index 19 - Country
+    email: values[23]?.trim() || '',        // Index 23 - Email
+    lead_id: values[33]?.trim() || '',      // Index 33 - Lead ID
+  };
+}
+
+// Extract year from potentially misplaced fields
+function extractYear(value) {
+  if (!value) return '';
+  // Look for 4-digit year pattern (19xx or 20xx)
+  const match = value.match(/\b(19|20)\d{2}\b/);
+  return match ? match[0] : '';
+}
+
+// Normalize ViciDial data into clean CRM format
+// CRITICAL: API 2 (phone_number_log) disposition takes priority over API 1 status
+function normalizeViciDialData(leadInfo, callHistory, recordings) {
+  const result = {
+    full_name: null,
+    phone: null,
+    email: null,
+    address: null,
+    vehicle: null,
+    agent: null,
+    call_details: null,
+    recording: null,
+    missing_fields: [],
+  };
+
+  // From Lead Info (API 1)
+  if (leadInfo) {
+    // Full name
+    const firstName = leadInfo.first_name || '';
+    const lastName = leadInfo.last_name || '';
+    result.full_name = [firstName, lastName].filter(Boolean).join(' ') || null;
+    
+    // Phone
+    result.phone = leadInfo.phone_number || null;
+    
+    // Email
+    result.email = leadInfo.email || null;
+    
+    // Address - combine address1 + city + state + postal_code
+    const addressParts = [
+      leadInfo.address1,
+      leadInfo.city,
+      leadInfo.state,
+      leadInfo.postal_code
+    ].filter(Boolean);
+    result.address = addressParts.length > 0 ? addressParts.join(', ') : null;
+    
+    // Vehicle - make from address2, model from address3
+    const make = leadInfo.address2 || '';
+    const model = leadInfo.address3 || '';
+    // Year might be in state field (bad data mapping)
+    let year = extractYear(leadInfo.state) || extractYear(leadInfo.address1) || '';
+    
+    if (make || model || year) {
+      result.vehicle = {
+        year: year || null,
+        make: make || null,
+        model: model || null,
+      };
+    }
+    
+    // Agent from API 1 (will be overwritten by API 2 if available)
+    result.agent = leadInfo.user || null;
+  } else {
+    result.missing_fields.push('lead_info');
+  }
+
+  // From Call History (API 2) - TRUST THIS FOR DISPOSITION
+  if (callHistory && callHistory.length > 0) {
+    // Get most recent call (first in array, should be sorted newest first)
+    const latestCall = callHistory[0];
+    
+    result.call_details = {
+      call_date: latestCall.call_date || null,
+      duration_seconds: parseInt(latestCall.length_in_sec || '0', 10),
+      disposition: latestCall.lead_status || latestCall.status || null, // ALWAYS use API 2 disposition
+      hangup: latestCall.hangup_reason || null,
+    };
+    
+    // Agent from API 2 takes priority
+    if (latestCall.user) {
+      result.agent = latestCall.user;
+    }
+  } else {
+    result.call_details = null;
+  }
+
+  // From Recordings (API 3)
+  if (recordings && recordings.length > 0) {
+    // Get most recent recording
+    const latestRecording = recordings[0];
+    result.recording = latestRecording.location || null;
+  } else {
+    result.recording = null;
+  }
+
+  // Clean up missing_fields
+  if (result.missing_fields.length === 0) {
+    delete result.missing_fields;
+  }
+
+  return result;
+}
+
 export function useSearch() {
   const [query, setQuery] = useState('');
   const [result, setResult] = useState(null);
@@ -54,7 +189,7 @@ export function useSearch() {
     fetchDialerConfig();
   }, []);
 
-  // Fetch from ViciDial (client-side)
+  // Fetch from ViciDial (client-side) with proper field mapping
   async function fetchViciDial(phoneDigits) {
     if (!dialerConfig?.is_active || !dialerConfig?.dialer_url) {
       return null;
@@ -63,47 +198,74 @@ export function useSearch() {
     const baseUrl = `${dialerConfig.dialer_url}${dialerConfig.api_path || '/vicidial/non_agent_api.php'}`;
     const baseParams = `user=${dialerConfig.api_user}&pass=${dialerConfig.api_pass}&source=test&stage=pipe&header=YES`;
 
+    let leadId = null;
+    let leadInfo = null;
+    let callHistory = [];
+    let recordings = [];
+    const errors = [];
+
     try {
-      // 1. Lead Search by Phone
+      // API 1: Lead Search by Phone → get lead_id
       const leadSearchUrl = `${baseUrl}?function=lead_search&${baseParams}&phone_number=${phoneDigits}`;
       const leadSearchRes = await fetch(leadSearchUrl, { mode: 'cors' });
       const leadSearchText = await leadSearchRes.text();
       const leadSearchData = parseViciDialResponse(leadSearchText);
 
-      let leadId = null;
-      let leadInfo = null;
-
       if (leadSearchData.data?.length > 0) {
         leadId = leadSearchData.data[0]?.lead_id;
-        
-        // 2. Lead All Info (if we have lead_id)
-        if (leadId) {
-          const leadInfoUrl = `${baseUrl}?function=lead_all_info&${baseParams}&lead_id=${leadId}`;
-          const leadInfoRes = await fetch(leadInfoUrl, { mode: 'cors' });
-          const leadInfoText = await leadInfoRes.text();
-          const leadInfoData = parseViciDialResponse(leadInfoText);
-          if (leadInfoData.data?.length > 0) {
-            leadInfo = leadInfoData.data[0];
-          }
-        }
       }
 
-      // 3. Phone Number Log (call history)
+      // API 1b: Lead All Info (if we have lead_id)
+      if (leadId) {
+        const leadInfoUrl = `${baseUrl}?function=lead_all_info&${baseParams}&lead_id=${leadId}`;
+        const leadInfoRes = await fetch(leadInfoUrl, { mode: 'cors' });
+        const leadInfoText = await leadInfoRes.text();
+        leadInfo = parseLeadAllInfo(leadInfoText);
+      }
+    } catch (err) {
+      console.error('ViciDial lead search error:', err);
+      errors.push('lead_search');
+    }
+
+    try {
+      // API 2: Phone Number Log (call history) - CRITICAL for disposition
       const callLogUrl = `${baseUrl}?function=phone_number_log&${baseParams}&phone_number=${phoneDigits}&type=ALL`;
       const callLogRes = await fetch(callLogUrl, { mode: 'cors' });
       const callLogText = await callLogRes.text();
       const callLogData = parseViciDialResponse(callLogText);
-
-      return {
-        lead_id: leadId,
-        lead_info: leadInfo,
-        call_history: callLogData.data || [],
-        raw_lead_search: leadSearchText,
-      };
+      callHistory = callLogData.data || [];
     } catch (err) {
-      console.error('ViciDial fetch error:', err);
-      return { error: err.message };
+      console.error('ViciDial call log error:', err);
+      errors.push('phone_number_log');
     }
+
+    try {
+      // API 3: Recording Lookup (if we have lead_id)
+      if (leadId) {
+        const recordingUrl = `${baseUrl}?function=recording_lookup&${baseParams}&lead_id=${leadId}`;
+        const recordingRes = await fetch(recordingUrl, { mode: 'cors' });
+        const recordingText = await recordingRes.text();
+        const recordingData = parseViciDialResponse(recordingText);
+        recordings = recordingData.data || [];
+      }
+    } catch (err) {
+      console.error('ViciDial recording lookup error:', err);
+      errors.push('recording_lookup');
+    }
+
+    // Normalize all data into clean format
+    const normalized = normalizeViciDialData(leadInfo, callHistory, recordings);
+
+    return {
+      lead_id: leadId,
+      normalized: normalized,
+      raw: {
+        lead_info: leadInfo,
+        call_history: callHistory,
+        recordings: recordings,
+      },
+      errors: errors.length > 0 ? errors : null,
+    };
   }
 
   const searchNumber = useCallback(
@@ -133,7 +295,7 @@ export function useSearch() {
         setResult({
           ...crmResponse.data,
           vicidial: vicidialData,
-          vicidial_available: !!vicidialData && !vicidialData.error,
+          vicidial_available: !!vicidialData && !vicidialData.errors?.length,
         });
       } catch (err) {
         setError(err.response?.data?.error || 'Search failed');
@@ -179,7 +341,7 @@ export function useSearch() {
       setResult({
         ...crmResponse.data,
         vicidial: vicidialData,
-        vicidial_available: !!vicidialData && !vicidialData.error,
+        vicidial_available: !!vicidialData && !vicidialData.errors?.length,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Search failed');
