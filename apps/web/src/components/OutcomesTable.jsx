@@ -12,8 +12,8 @@ export default function OutcomesTable({ compact = false }) {
   useEffect(() => {
     async function fetchOutcomes() {
       try {
-        const res = await api.get('/closer-records?limit=100&page=1');
-        setItems(res.data.closerRecords || res.data.outcomes || []);
+        const res = await api.get('/outcomes?limit=100&page=1');
+        setItems(res.data.outcomes || []);
       } catch (error) {
         console.error('Failed to fetch records:', error);
         toast.error('Failed to load records');
