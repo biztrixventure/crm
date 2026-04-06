@@ -189,6 +189,15 @@ export function useSearch() {
     fetchDialerConfig();
   }, []);
 
+  // Helper to wrap URL with CORS proxy if configured
+  function corsProxyUrl(url) {
+    if (dialerConfig?.cors_proxy) {
+      // CORS proxy wraps the URL (e.g., https://corsproxy.io/?url=)
+      return `${dialerConfig.cors_proxy}${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
+
   // Fetch from ViciDial directly from browser (client-side)
   // Config comes from server, but API calls are made from user's browser
   async function fetchViciDial(phoneDigits) {
@@ -207,7 +216,7 @@ export function useSearch() {
 
     try {
       // API 1: Lead Search by Phone → get lead_id (direct browser request)
-      const leadSearchUrl = `${baseUrl}?function=lead_search&${authParams}&phone_number=${phoneDigits}`;
+      const leadSearchUrl = corsProxyUrl(`${baseUrl}?function=lead_search&${authParams}&phone_number=${phoneDigits}`);
       console.log('Fetching lead search:', leadSearchUrl);
       
       const leadSearchRes = await fetch(leadSearchUrl);
@@ -224,7 +233,7 @@ export function useSearch() {
 
       // API 1b: Lead All Info (if we have lead_id)
       if (leadId) {
-        const leadInfoUrl = `${baseUrl}?function=lead_all_info&${authParams}&lead_id=${leadId}`;
+        const leadInfoUrl = corsProxyUrl(`${baseUrl}?function=lead_all_info&${authParams}&lead_id=${leadId}`);
         console.log('Fetching lead info:', leadInfoUrl);
         
         const leadInfoRes = await fetch(leadInfoUrl);
@@ -241,7 +250,7 @@ export function useSearch() {
 
     try {
       // API 2: Phone Number Log (call history) - CRITICAL for disposition
-      const callLogUrl = `${baseUrl}?function=phone_number_log&${authParams}&phone_number=${phoneDigits}&type=ALL`;
+      const callLogUrl = corsProxyUrl(`${baseUrl}?function=phone_number_log&${authParams}&phone_number=${phoneDigits}&type=ALL`);
       console.log('Fetching call log:', callLogUrl);
       
       const callLogRes = await fetch(callLogUrl);
@@ -259,7 +268,7 @@ export function useSearch() {
     try {
       // API 3: Recording Lookup (if we have lead_id)
       if (leadId) {
-        const recordingUrl = `${baseUrl}?function=recording_lookup&${authParams}&lead_id=${leadId}`;
+        const recordingUrl = corsProxyUrl(`${baseUrl}?function=recording_lookup&${authParams}&lead_id=${leadId}`);
         console.log('Fetching recording:', recordingUrl);
         
         const recordingRes = await fetch(recordingUrl);

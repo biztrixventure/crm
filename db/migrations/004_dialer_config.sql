@@ -10,14 +10,15 @@ CREATE TABLE IF NOT EXISTS dialer_config (
   api_user      text NOT NULL,
   api_pass      text NOT NULL,
   api_path      text DEFAULT '/vicidial/non_agent_api.php',
+  cors_proxy    text DEFAULT 'https://corsproxy.io/?',
   is_active     boolean DEFAULT true,
   updated_at    timestamptz DEFAULT now(),
   updated_by    uuid REFERENCES users(id)
 );
 
--- Insert pre-configured row with wavetechnew.i5.tel
-INSERT INTO dialer_config (dialer_url, api_user, api_pass, api_path, is_active)
-VALUES ('http://wavetechnew.i5.tel', 'apiuser', 'apiuser123', '/vicidial/non_agent_api.php', true);
+-- Insert pre-configured row with wavetechnew.i5.tel and CORS proxy
+INSERT INTO dialer_config (dialer_url, api_user, api_pass, api_path, cors_proxy, is_active)
+VALUES ('http://wavetechnew.i5.tel', 'apiuser', 'apiuser123', '/vicidial/non_agent_api.php', 'https://corsproxy.io/?', true);
 
 -- Enable RLS (then disable for service role access)
 ALTER TABLE dialer_config ENABLE ROW LEVEL SECURITY;

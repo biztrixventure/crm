@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
-import { Save, Loader2, Phone, Link, User, Key, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Save, Loader2, Phone, Link, User, Key, CheckCircle, XCircle, AlertCircle, ExternalLink, Shield } from 'lucide-react';
 
 export default function DialerSettings() {
   const [config, setConfig] = useState({
@@ -9,6 +9,7 @@ export default function DialerSettings() {
     api_user: '',
     api_pass: '',
     api_path: '/vicidial/non_agent_api.php',
+    cors_proxy: 'https://corsproxy.io/?',
     is_active: false,
   });
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,7 @@ export default function DialerSettings() {
           api_user: res.data.config.api_user || '',
           api_pass: res.data.config.api_pass || '',
           api_path: res.data.config.api_path || '/vicidial/non_agent_api.php',
+          cors_proxy: res.data.config.cors_proxy || 'https://corsproxy.io/?',
           is_active: res.data.config.is_active || false,
         });
       }
@@ -65,27 +67,32 @@ export default function DialerSettings() {
     setTestResult(null);
 
     try {
-      // Test directly from browser (client-side) since ViciDial may not be reachable from server
+      // Test directly from browser using CORS proxy
       const apiPath = config.api_path || '/vicidial/non_agent_api.php';
-      const testUrl = `${config.dialer_url}${apiPath}?function=lead_search&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&phone_number=0000000000&stage=pipe&header=YES`;
+      const rawUrl = `${config.dialer_url}${apiPath}?function=lead_search&user=${encodeURIComponent(config.api_user)}&pass=${encodeURIComponent(config.api_pass)}&source=test&phone_number=0000000000&stage=pipe&header=YES`;
       
-      console.log('Testing dialer URL:', testUrl);
+      // Apply CORS proxy if configured
+      const testUrl = config.cors_proxy 
+        ? `${config.cors_proxy}${encodeURIComponent(rawUrl)}`
+        : rawUrl;
+      
+      console.log('Testing dialer URL (via CORS proxy):', testUrl);
       const response = await fetch(testUrl);
       const text = await response.text();
       console.log('Test response:', text);
       
       if (text.includes('ERROR')) {
         setTestResult({ success: false, message: `API Error: ${text}` });
-      } else if (response.ok) {
-        setTestResult({ success: true, message: 'Connection successful! API is responding from your browser.' });
+      } else if (response.ok && text.length > 0) {
+        setTestResult({ success: true, message: 'Connection successful! API is responding via CORS proxy.' });
       } else {
-        setTestResult({ success: false, message: `HTTP ${response.status}: ${text}` });
+        setTestResult({ success: false, message: `HTTP ${response.status}: ${text || 'Empty response'}` });
       }
     } catch (error) {
       console.error('Dialer test error:', error);
       setTestResult({ 
         success: false, 
-        message: `Connection failed: ${error.message}. Make sure your network can reach the dialer server.`
+        message: `Connection failed: ${error.message}. Try a different CORS proxy or check your dialer URL.`
       });
     } finally {
       setTesting(false);
@@ -196,6 +203,23 @@ export default function DialerSettings() {
               placeholder="/vicidial/non_agent_api.php"
               className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
+              <Shield size={16} className="inline mr-1.5" />
+              CORS Proxy URL
+            </label>
+            <input
+              type="text"
+              value={config.cors_proxy}
+              onChange={(e) => setConfig({ ...config, cors_proxy: e.target.value })}
+              placeholder="https://corsproxy.io/?"
+              className="w-full px-4 py-3 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+            />
+            <p className="text-xs text-primary-500 dark:text-primary-400 mt-1">
+              Required to bypass CORS. Free options: <code>https://corsproxy.io/?</code> or <code>https://api.allorigins.win/raw?url=</code>
+            </p>
           </div>
 
           <div className="flex items-center">

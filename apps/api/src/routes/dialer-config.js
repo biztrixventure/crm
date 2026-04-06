@@ -45,6 +45,7 @@ router.get(
           api_user: data.api_user,
           api_pass: data.api_pass,
           api_path: data.api_path,
+          cors_proxy: data.cors_proxy || 'https://corsproxy.io/?',
           is_active: data.is_active,
           updated_at: data.updated_at,
         },
@@ -65,7 +66,7 @@ router.put(
   '/',
   roleGuard('super_admin'),
   async (req, res) => {
-    const { dialer_url, api_user, api_pass, api_path, is_active } = req.body;
+    const { dialer_url, api_user, api_pass, api_path, cors_proxy, is_active } = req.body;
 
     try {
       // Get existing config
@@ -83,6 +84,7 @@ router.put(
             api_user: api_user?.trim() || '',
             api_pass: api_pass || '',
             api_path: api_path?.trim() || '/vicidial/non_agent_api.php',
+            cors_proxy: cors_proxy?.trim() || 'https://corsproxy.io/?',
             is_active: is_active ?? false,
             updated_at: new Date().toISOString(),
             updated_by: req.user.id,
@@ -102,6 +104,7 @@ router.put(
             api_user: api_user?.trim() || '',
             api_pass: api_pass || '',
             api_path: api_path?.trim() || '/vicidial/non_agent_api.php',
+            cors_proxy: cors_proxy?.trim() || 'https://corsproxy.io/?',
             is_active: is_active ?? false,
             updated_by: req.user.id,
           })
