@@ -35,7 +35,7 @@ router.get('/', validateQuery(outcomeQuerySchema), async (req, res) => {
       .order('created_at', { ascending: false });
 
     // Role-based filtering
-    if (role === 'closer') {
+    if (role === 'closer' || role === 'closer_manager') {
       query = query.eq('closer_id', userId);
     } else if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
@@ -75,8 +75,8 @@ router.get('/', validateQuery(outcomeQuerySchema), async (req, res) => {
   }
 });
 
-// POST /outcomes - Create outcome (Closer only)
-router.post('/', roleGuard('closer'), validate(createOutcomeSchema), async (req, res) => {
+// POST /outcomes - Create outcome (Closer and Closer Manager)
+router.post('/', roleGuard('closer', 'closer_manager'), validate(createOutcomeSchema), async (req, res) => {
   const { id: closerId } = req.user;
   const { transfer_id, company_id, customer_phone, customer_name, disposition_id, remarks } = req.body;
 
