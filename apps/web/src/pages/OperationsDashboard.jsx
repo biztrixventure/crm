@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
 import { Building2, Phone, FileText, Users, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+// Sub-pages
+import OperationsCompanies from './operations/Companies';
+import OperationsTransfers from './operations/Transfers';
+import OperationsRecords from './operations/Records';
+import OperationsUsers from './operations/Users';
+import OperationsCallbacks from './operations/Callbacks';
 
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
   const colors = {
@@ -80,26 +87,41 @@ function Overview() {
       <div className="bg-white dark:bg-dark-800 rounded-2xl p-8 shadow-lg border border-cream-200/50 dark:border-dark-700/50">
         <h2 className="text-2xl font-bold text-primary-900 dark:text-primary-100 mb-6">View Options</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 cursor-default">
+          <Link
+            to="/operations/companies"
+            className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow"
+          >
             <Building2 className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
             <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Companies</p>
-          </div>
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 cursor-default">
+          </Link>
+          <Link
+            to="/operations/transfers"
+            className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow"
+          >
             <Phone className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
             <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Transfers</p>
-          </div>
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 cursor-default">
+          </Link>
+          <Link
+            to="/operations/records"
+            className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow"
+          >
             <FileText className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
             <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Records</p>
-          </div>
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 cursor-default">
+          </Link>
+          <Link
+            to="/operations/users"
+            className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow"
+          >
             <Users className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
             <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Users</p>
-          </div>
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 cursor-default">
+          </Link>
+          <Link
+            to="/operations/callbacks"
+            className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 hover:shadow-lg transition-shadow"
+          >
             <Phone className="w-6 h-6 text-primary-600 dark:text-primary-400 mb-2" />
             <p className="font-medium text-primary-900 dark:text-primary-100 text-sm">Callbacks</p>
-          </div>
+          </Link>
         </div>
       </div>
     </div>
@@ -117,7 +139,15 @@ export default function OperationsDashboard() {
         <p className="text-primary-600 dark:text-primary-400 mt-2">Read-only oversight of all operations</p>
       </div>
 
-      {isRoot ? <Overview /> : <Routes></Routes>}
+      {isRoot ? <Overview /> : (
+        <Routes>
+          <Route path="/companies" element={<OperationsCompanies />} />
+          <Route path="/transfers" element={<OperationsTransfers />} />
+          <Route path="/records" element={<OperationsRecords />} />
+          <Route path="/users" element={<OperationsUsers />} />
+          <Route path="/callbacks" element={<OperationsCallbacks />} />
+        </Routes>
+      )}
     </div>
   );
 }
