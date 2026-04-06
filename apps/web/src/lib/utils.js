@@ -68,6 +68,10 @@ export const roleLabels = {
   company_admin: 'Company Admin',
   closer: 'Closer',
   fronter: 'Fronter',
+  closer_manager: 'Closer Manager',
+  operations_manager: 'Operations Manager',
+  compliance_manager: 'Compliance Manager',
+  compliance_agent: 'Compliance Agent',
 };
 
 // Get initials from name

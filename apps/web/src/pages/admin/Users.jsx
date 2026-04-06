@@ -19,6 +19,10 @@ const roleOptions = [
   'company_admin',
   'closer',
   'fronter',
+  'closer_manager',
+  'operations_manager',
+  'compliance_manager',
+  'compliance_agent',
 ];
 
 export default function UsersPage() {
@@ -49,6 +53,7 @@ export default function UsersPage() {
   }, [isSuperAdmin, currentUser?.role]);
 
   const requiresCompany = ['company_admin', 'fronter'].includes(formData.role);
+  const isBizTrixInternal = ['closer_manager', 'operations_manager', 'compliance_manager', 'compliance_agent'].includes(formData.role);
 
   useEffect(() => {
     fetchUsers();

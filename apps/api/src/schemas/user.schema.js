@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const roles = ['super_admin', 'readonly_admin', 'company_admin', 'closer', 'fronter'];
+const roles = ['super_admin', 'readonly_admin', 'company_admin', 'closer', 'fronter', 'closer_manager', 'operations_manager', 'compliance_manager', 'compliance_agent'];
 
 export const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
