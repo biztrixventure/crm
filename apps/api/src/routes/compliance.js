@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { notifyComplianceManagerEvent, notifyComplianceAgentEvent } from '../services/notification.js';
+import { createBatchSchema, submitReviewSchema, addDncSchema } from '../schemas/compliance.schema.js';
 
 const router = Router();
 
@@ -59,57 +60,6 @@ async function canAccessCompany(managerId, companyId) {
   // Otherwise, check if company is in assigned list
   return assignments.some((a) => a.company_id === companyId);
 }
-
-// ============================================================
-// SCHEMAS
-// ============================================================
-
-const createBatchSchema = {
-  type: 'object',
-  required: ['company_id', 'date_from', 'date_to'],
-  properties: {
-    company_id: { type: 'string' },
-    date_from: { type: 'string', format: 'date' },
-    date_to: { type: 'string', format: 'date' },
-    assign_to: { type: 'string' }, // optional: compliance_agent_id
-  },
-  additionalProperties: false,
-};
-
-const submitReviewSchema = {
-  type: 'object',
-  required: ['batch_id', 'closer_record_id', 'review_status'],
-  properties: {
-    batch_id: { type: 'string' },
-    closer_record_id: { type: 'string' },
-    review_status: {
-      enum: ['approved', 'issue_found', 'pending'],
-    },
-    flag_reason: {
-      enum: [
-        'Wrong VIN',
-        'Wrong Reference No',
-        'Wrong Plan',
-        'Missing Info',
-        'Duplicate',
-        'Other',
-      ],
-    },
-    flag_notes: { type: 'string' },
-  },
-  additionalProperties: false,
-};
-
-const addDncSchema = {
-  type: 'object',
-  required: ['phone_number'],
-  properties: {
-    phone_number: { type: 'string' },
-    reason: { type: 'string' },
-    notes: { type: 'string' },
-  },
-  additionalProperties: false,
-};
 
 // ============================================================
 // CLOSER RECORDS (read-only for compliance)
@@ -301,7 +251,10 @@ router.post('/batches', ensureComplianceManager, validate(createBatchSchema), as
     });
   } catch (err) {
     console.error('Create batch error:', err);
-    res.status(500).json({ error: 'Failed to create batch' });
+    res.status(500).json({
+      error: 'Failed to create batch',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
   }
 });
 
@@ -541,7 +494,7 @@ router.patch('/batches/:id/complete', ensureComplianceAgent, async (req, res) =>
 
 // POST /compliance/reviews - Submit review (flag/approve) for a record
 router.post('/reviews', validate(submitReviewSchema), async (req, res) => {
-  const { batch_id, closer_record_id, review_status, flag_reason, flag_notes } = req.body;
+  const { batch_id, closer_record_id, status, flag_reason, flag_notes } = req.body;
   const { id: userId } = req.user;
 
   try {
@@ -563,7 +516,7 @@ router.post('/reviews', validate(submitReviewSchema), async (req, res) => {
     }
 
     // If marking issue_found, flag_reason is required
-    if (review_status === 'issue_found' && !flag_reason) {
+    if (status === 'issue_found' && !flag_reason) {
       return res.status(422).json({
         error: 'flag_reason is required when marking as issue_found',
       });
@@ -577,8 +530,8 @@ router.post('/reviews', validate(submitReviewSchema), async (req, res) => {
           batch_id,
           closer_record_id,
           reviewed_by: userId,
-          status: review_status,
-          flag_reason: review_status === 'issue_found' ? flag_reason : null,
+          status: status,
+          flag_reason: status === 'issue_found' ? flag_reason : null,
           flag_notes,
           reviewed_at: new Date().toISOString(),
         },
@@ -608,7 +561,7 @@ router.post('/reviews', validate(submitReviewSchema), async (req, res) => {
       .eq('id', batch_id);
 
     // Notify manager if issue flagged
-    if (review_status === 'issue_found') {
+    if (status === 'issue_found') {
       await notifyComplianceManagerEvent({
         eventType: 'record_flagged',
         message: `A record has been flagged: ${flag_reason}`,

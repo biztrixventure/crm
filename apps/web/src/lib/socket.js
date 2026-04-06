@@ -7,16 +7,15 @@ export function initSocket() {
   if (socket?.connected) return socket;
 
   const isHttps = window.location.protocol === 'https:';
-  const isProdHost = !['localhost', '127.0.0.1'].includes(window.location.hostname);
 
+  // For production, use websocket only to avoid reverse proxy polling issues
+  // Polling returns 400 on some reverse proxies, websocket is more reliable
   socket = io(window.location.origin, {
-    // Behind reverse proxies, polling-first is more reliable than websocket-first.
-    transports: isProdHost ? ['polling'] : ['websocket', 'polling'],
-    upgrade: !isProdHost,
+    transports: ['websocket'],
     autoConnect: false,
     withCredentials: true,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 3,
     reconnectionDelay: 1000,
     timeout: 10000,
     secure: isHttps,
@@ -31,7 +30,7 @@ export function connectSocket() {
   }
 
   const { user } = useAuthStore.getState();
-  
+
   if (!socket.connected && user) {
     socket.connect();
   }
@@ -45,6 +44,12 @@ export function connectSocket() {
       companyId: user.companyId,
       role: user.role,
     });
+  });
+
+  // Handle connection errors gracefully
+  socket.off('connect_error');
+  socket.on('connect_error', (error) => {
+    console.warn('Socket.io offline (app still works):', error?.message);
   });
 
   return socket;
