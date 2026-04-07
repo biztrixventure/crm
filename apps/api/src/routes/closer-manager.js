@@ -122,13 +122,14 @@ async function getCloserPerformanceStats(closerId, period = 'today') {
 // CLOSERS MANAGEMENT
 // ============================================================
 
-// GET /closer-manager/closers - List all closers with basic stats
+// GET /closer-manager/closers - List all closers managed by this manager
 router.get('/closers', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const offset = parseInt(req.query.offset) || 0;
+  const { id: managerId } = req.user;
 
   try {
-    // Get all closers
+    // Get closers managed by this manager
     const { data: closers, error } = await supabase
       .from('users')
       .select(`
@@ -140,6 +141,7 @@ router.get('/closers', async (req, res) => {
         created_at,
         company_id
       `)
+      .eq('managed_by', managerId)
       .eq('role', 'closer')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
@@ -185,7 +187,7 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
 
     const userId = authData.user.id;
 
-    // Create user record with role = 'closer' and company_id = null
+    // Create user record with role = 'closer', company_id = null, and managed_by = creatorId
     const { data: userRecord, error: userError } = await supabase
       .from('users')
       .insert([
@@ -195,6 +197,7 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
           full_name,
           role: 'closer',
           company_id: null,
+          managed_by: creatorId, // Link to the closer_manager who created them
           is_active: true,
           created_by: creatorId,
         },
@@ -259,15 +262,17 @@ router.patch('/closers/:id', async (req, res) => {
 // PERFORMANCE & LEADERBOARD
 // ============================================================
 
-// GET /closer-manager/performance - Leaderboard with all closers ranked by sales
+// GET /closer-manager/performance - Leaderboard with managed closers ranked by sales
 router.get('/performance', async (req, res) => {
   const period = req.query.period || 'today'; // today, yesterday, this_week, this_month
+  const { id: managerId } = req.user;
 
   try {
-    // Get all closers with their stats
+    // Get closers managed by this manager
     const { data: closers, error: closersError } = await supabase
       .from('users')
       .select('id, email, full_name')
+      .eq('managed_by', managerId)
       .eq('role', 'closer')
       .eq('is_active', true);
 
@@ -332,13 +337,38 @@ router.get('/performance/:id', async (req, res) => {
 // CLOSER RECORDS
 // ============================================================
 
-// GET /closer-manager/records - View all closer records from all closers
+// GET /closer-manager/records - View all closer records from managed closers
 router.get('/records', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const offset = parseInt(req.query.offset) || 0;
   const { closer_id, status, disposition_id } = req.query;
+  const { id: managerId } = req.user;
 
   try {
+    // First, get all closers managed by this manager
+    const { data: managedClosers, error: closersError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('managed_by', managerId)
+      .eq('role', 'closer');
+
+    if (closersError) throw closersError;
+
+    const closerIds = (managedClosers || []).map(c => c.id);
+
+    // If no closers are managed, return empty results
+    if (closerIds.length === 0) {
+      return res.json({
+        records: [],
+        pagination: {
+          limit,
+          offset,
+          hasMore: false,
+        },
+      });
+    }
+
+    // Get records from managed closers
     let query = supabase
       .from('closer_records')
       .select(`
@@ -346,6 +376,7 @@ router.get('/records', async (req, res) => {
         closer:users!closer_records_closer_id_fkey (id, full_name),
         disposition:dispositions (id, label)
       `)
+      .in('closer_id', closerIds)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
 
@@ -378,13 +409,37 @@ router.get('/records', async (req, res) => {
 // TRANSFERS
 // ============================================================
 
-// GET /closer-manager/transfers - View all transfers (read-only)
+// GET /closer-manager/transfers - View all transfers from managed closers (read-only)
 router.get('/transfers', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const offset = parseInt(req.query.offset) || 0;
   const { company_id, closer_id, from, to } = req.query;
+  const { id: managerId } = req.user;
 
   try {
+    // Get all closers managed by this manager
+    const { data: managedClosers, error: closersError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('managed_by', managerId)
+      .eq('role', 'closer');
+
+    if (closersError) throw closersError;
+
+    const closerIds = (managedClosers || []).map(c => c.id);
+
+    // If no closers are managed, return empty results
+    if (closerIds.length === 0) {
+      return res.json({
+        transfers: [],
+        pagination: {
+          limit,
+          offset,
+          hasMore: false,
+        },
+      });
+    }
+
     let query = supabase
       .from('transfers')
       .select(`
@@ -393,6 +448,7 @@ router.get('/transfers', async (req, res) => {
         fronter:users!transfers_fronter_id_fkey (id, full_name, email),
         company:companies!transfers_company_id_fkey (id, name, display_name)
       `)
+      .in('closer_id', closerIds)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
 

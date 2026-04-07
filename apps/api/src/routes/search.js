@@ -50,10 +50,34 @@ router.get(
         transferFilter = (query) => query.eq('closer_id', userId);
         recordFilter = (query) => query.eq('closer_id', userId);
       } else if (role === 'closer_manager') {
-        // Closer managers can search ALL closers' records (they manage all closers)
-        // No filter needed - they can see all closer records
-        transferFilter = (query) => query;
-        recordFilter = (query) => query;
+        // Closer managers can search records from their managed closers only
+        // First get all closers managed by this manager
+        try {
+          const { data: managedClosers, error: closersError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('managed_by', userId)
+            .eq('role', 'closer');
+
+          if (closersError) {
+            console.error('Error fetching managed closers:', closersError);
+            return res.json({ results: [], count: 0 });
+          }
+
+          const closerIds = (managedClosers || []).map(c => c.id);
+
+          if (!closerIds || closerIds.length === 0) {
+            // No managed closers, return empty results
+            return res.json({ results: [], count: 0 });
+          }
+
+          // Filter by managed closers
+          transferFilter = (query) => query.in('closer_id', closerIds);
+          recordFilter = (query) => query.in('closer_id', closerIds);
+        } catch (err) {
+          console.error('Error in closer_manager managed closers lookup:', err);
+          return res.json({ results: [], count: 0 });
+        }
       } else if (role === 'company_admin') {
         // Company admins can only search their company's records
         if (!companyId) {
