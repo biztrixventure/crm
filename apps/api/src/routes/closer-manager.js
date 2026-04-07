@@ -351,8 +351,9 @@ router.get('/records', async (req, res) => {
         status,
         created_at,
         closer_id,
+        disposition_id,
         closer:users!closer_records_closer_id_fkey (id, full_name),
-        dispositions (id, label)
+        dispositions!closer_records_disposition_id_fkey (id, label)
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
@@ -375,7 +376,10 @@ router.get('/records', async (req, res) => {
     });
   } catch (err) {
     console.error('Get closer records error:', err);
-    res.status(500).json({ error: 'Failed to fetch closer records' });
+    res.status(500).json({
+      error: 'Failed to fetch closer records',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
