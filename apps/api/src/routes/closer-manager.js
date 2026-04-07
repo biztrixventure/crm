@@ -342,18 +342,9 @@ router.get('/records', async (req, res) => {
     let query = supabase
       .from('closer_records')
       .select(`
-        id,
-        customer_name,
-        customer_phone,
-        customer_email,
-        vin,
-        reference_number,
-        status,
-        created_at,
-        closer_id,
-        disposition_id,
+        *,
         closer:users!closer_records_closer_id_fkey (id, full_name),
-        dispositions!closer_records_disposition_id_fkey (id, label)
+        disposition:dispositions (id, label)
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
