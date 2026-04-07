@@ -27,12 +27,19 @@ router.get(
     const { phone } = req.query;
     const { id: userId, role, companyId } = req.user;
 
+    console.log('🔍 SEARCH API CALLED:');
+    console.log(`   Phone: ${phone}`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   Role: ${role}`);
+    console.log(`   Company ID: ${companyId}`);
+
     if (!phone || !phone.trim()) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
     try {
       const normalizedPhone = normalizePhoneLocal(phone);
+      console.log(`   Normalized: ${normalizedPhone}`);
 
       if (!normalizedPhone) {
         return res.status(400).json({ error: 'Invalid phone number format' });
@@ -53,6 +60,7 @@ router.get(
         // Closer managers can search records from their managed closers only
         // First get all closers managed by this manager
         try {
+          console.log(`   [closer_manager] Fetching closers managed by ${userId}`);
           const { data: managedClosers, error: closersError } = await supabase
             .from('users')
             .select('id')
@@ -60,14 +68,20 @@ router.get(
             .eq('role', 'closer');
 
           if (closersError) {
-            console.error('Error fetching managed closers:', closersError);
+            console.error('❌ Error fetching managed closers:', closersError);
             return res.json({ results: [], count: 0 });
+          }
+
+          console.log(`   [closer_manager] Found ${managedClosers?.length || 0} managed closers`);
+          if (managedClosers && managedClosers.length > 0) {
+            console.log(`   [closer_manager] Closer IDs:`, managedClosers.map(c => c.id));
           }
 
           const closerIds = (managedClosers || []).map(c => c.id);
 
           if (!closerIds || closerIds.length === 0) {
             // No managed closers, return empty results
+            console.log(`   [closer_manager] ⚠️  No managed closers found, returning empty`);
             return res.json({ results: [], count: 0 });
           }
 
@@ -75,7 +89,7 @@ router.get(
           transferFilter = (query) => query.in('closer_id', closerIds);
           recordFilter = (query) => query.in('closer_id', closerIds);
         } catch (err) {
-          console.error('Error in closer_manager managed closers lookup:', err);
+          console.error('❌ Error in closer_manager managed closers lookup:', err);
           return res.json({ results: [], count: 0 });
         }
       } else if (role === 'company_admin') {
@@ -250,6 +264,11 @@ router.get(
       }));
 
       const results = [...transferResults, ...recordResults];
+
+      console.log(`✅ SEARCH COMPLETE:`);
+      console.log(`   Transfers: ${transferResults.length}`);
+      console.log(`   Records: ${recordResults.length}`);
+      console.log(`   Total: ${results.length}`);
 
       res.json({ results, count: results.length });
     } catch (err) {
