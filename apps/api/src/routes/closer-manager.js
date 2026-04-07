@@ -329,6 +329,57 @@ router.get('/performance/:id', async (req, res) => {
 });
 
 // ============================================================
+// CLOSER RECORDS
+// ============================================================
+
+// GET /closer-manager/records - View all closer records from all closers
+router.get('/records', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const offset = parseInt(req.query.offset) || 0;
+  const { closer_id, status, disposition_id } = req.query;
+
+  try {
+    let query = supabase
+      .from('closer_records')
+      .select(`
+        id,
+        customer_name,
+        customer_phone,
+        customer_email,
+        vin,
+        reference_number,
+        status,
+        created_at,
+        closer_id,
+        closer:users!closer_records_closer_id_fkey (id, full_name),
+        dispositions (id, label)
+      `)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit);
+
+    if (closer_id) query = query.eq('closer_id', closer_id);
+    if (status) query = query.eq('status', status);
+    if (disposition_id) query = query.eq('disposition_id', disposition_id);
+
+    const { data: records, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      records: records || [],
+      pagination: {
+        limit,
+        offset,
+        hasMore: records && records.length > limit,
+      },
+    });
+  } catch (err) {
+    console.error('Get closer records error:', err);
+    res.status(500).json({ error: 'Failed to fetch closer records' });
+  }
+});
+
+// ============================================================
 // TRANSFERS
 // ============================================================
 

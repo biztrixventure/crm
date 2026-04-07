@@ -12,6 +12,7 @@ import CloserManagerTransfers from './closer-manager/Transfers';
 import CloserManagerRecord from './closer-manager/Record';
 import CloserManagerSearch from './closer-manager/Search';
 import CloserManagerCallbacks from './closer-manager/Callbacks';
+import CloserManagerCloserRecords from './closer-manager/CloserRecords';
 
 function KPICard({ title, value, icon: Icon, color = 'primary' }) {
   const colors = {
@@ -102,9 +103,9 @@ function Overview() {
             <Phone className="w-6 h-6 text-blue-600 dark:text-blue-400 mb-2" />
             <p className="font-medium text-blue-900 dark:text-blue-100 text-sm">Transfers</p>
           </Link>
-          <Link to="/closer-manager/records" className="p-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 hover:shadow-lg transition-shadow">
+          <Link to="/closer-manager/closer-records" className="p-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 hover:shadow-lg transition-shadow">
             <Plus className="w-6 h-6 text-accent-600 dark:text-accent-400 mb-2" />
-            <p className="font-medium text-accent-900 dark:text-accent-100 text-sm">My Records</p>
+            <p className="font-medium text-accent-900 dark:text-accent-100 text-sm">All Records</p>
           </Link>
           <Link to="/closer-manager/search" className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 hover:shadow-lg transition-shadow">
             <SearchIcon className="w-6 h-6 text-purple-600 dark:text-purple-400 mb-2" />
@@ -139,6 +140,7 @@ export default function CloserManagerDashboard() {
           <Route path="/performance" element={<CloserManagerPerformance />} />
           <Route path="/transfers" element={<CloserManagerTransfers />} />
           <Route path="/records" element={<CloserManagerRecord />} />
+          <Route path="/closer-records" element={<CloserManagerCloserRecords />} />
           <Route path="/search" element={<CloserManagerSearch />} />
           <Route path="/callbacks" element={<CloserManagerCallbacks />} />
         </Routes>

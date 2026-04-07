@@ -52,6 +52,7 @@ const navigation = {
   closer_manager: [
     { name: 'Dashboard', href: '/closer-manager', icon: HomeIcon },
     { name: 'My Records', href: '/closer-manager/records', icon: FileText },
+    { name: 'All Records', href: '/closer-manager/closer-records', icon: FileText },
     { name: 'Callbacks', href: '/closer-manager/callbacks', icon: Phone },
     { name: 'Number Search', href: '/closer-manager/search', icon: SearchIcon },
     { name: 'Closers', href: '/closer-manager/closers', icon: UsersIcon },
