@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/auth';
 import { Companies, Users } from './admin';
 import PlanManager from '../components/PlanManager';
 import ClientManager from '../components/ClientManager';
+import NumberSearch from './shared/NumberSearch';
 
 // KPI Card component
 function KPICard({ title, value, icon: Icon, trend, color = 'primary' }) {
@@ -539,6 +540,7 @@ export default function AdminDashboard() {
       <Route path="plans/*" element={<PlanManager />} />
       <Route path="clients/*" element={<ClientManager />} />
       <Route path="audit/*" element={<AuditLog />} />
+      <Route path="number-search" element={<NumberSearch />} />
     </Routes>
   );
 }
