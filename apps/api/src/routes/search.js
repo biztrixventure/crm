@@ -33,13 +33,17 @@ router.get(
     try {
       const normalizedPhone = normalizePhoneLocal(phone);
 
-      // Search in multiple places:
-      // 1. Transfers (recent transfers)
-      // 2. Closer records (past sales)
+      if (!normalizedPhone) {
+        return res.status(400).json({ error: 'Invalid phone number format' });
+      }
 
-      const [transfers, closerRecords] = await Promise.all([
-        // Search transfers
-        supabase
+      // Search in multiple places separately to handle errors gracefully
+      let transfersData = [];
+      let closerRecordsData = [];
+
+      // Search transfers
+      try {
+        const { data, error } = await supabase
           .from('transfers')
           .select(
             `
@@ -58,10 +62,20 @@ router.get(
           )
           .ilike('customer_phone', `%${normalizedPhone}%`)
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(10);
 
-        // Search closer records with disposition info
-        supabase
+        if (error) {
+          console.error('Transfers search error:', error);
+        } else if (data) {
+          transfersData = data;
+        }
+      } catch (err) {
+        console.error('Transfers query exception:', err);
+      }
+
+      // Search closer records
+      try {
+        const { data, error } = await supabase
           .from('closer_records')
           .select(
             `
@@ -82,45 +96,52 @@ router.get(
           )
           .ilike('customer_phone', `%${normalizedPhone}%`)
           .order('created_at', { ascending: false })
-          .limit(10),
-      ]);
+          .limit(10);
 
-      if (transfers.error) throw transfers.error;
-      if (closerRecords.error) throw closerRecords.error;
+        if (error) {
+          console.error('Closer records search error:', error);
+        } else if (data) {
+          closerRecordsData = data;
+        }
+      } catch (err) {
+        console.error('Closer records query exception:', err);
+      }
 
-      const results = [
-        ...(transfers.data || []).map((t) => ({
-          type: 'transfer',
-          id: t.id,
-          customer_phone: t.customer_phone,
-          customer_name: t.customer_name,
-          company: t.companies?.display_name || t.companies?.name,
-          status: t.status,
-          closer_name: t.closer?.full_name,
-          fronter_name: t.fronter?.full_name,
-          created_at: t.created_at,
-          is_sold: false, // Transfers are not yet completed sales
-        })),
-        ...(closerRecords.data || []).map((r) => ({
-          type: 'record',
-          id: r.id,
-          customer_phone: r.customer_phone,
-          customer_name: r.customer_name,
-          customer_email: r.customer_email,
-          vin: r.vin,
-          company: r.companies?.display_name || r.companies?.name,
-          status: r.status,
-          disposition: r.dispositions?.label,
-          closer_name: r.closer?.full_name,
-          created_at: r.created_at,
-          is_sold: r.dispositions?.label?.toLowerCase() === 'sold', // Determine if sold
-        })),
-      ];
+      // Safely map results
+      const transferResults = (transfersData || []).map((t) => ({
+        type: 'transfer',
+        id: t.id,
+        customer_phone: t.customer_phone,
+        customer_name: t.customer_name,
+        company: t.companies?.display_name || t.companies?.name || 'N/A',
+        status: t.status,
+        closer_name: t.closer?.full_name || 'Unknown',
+        fronter_name: t.fronter?.full_name || null,
+        created_at: t.created_at,
+        is_sold: false, // Transfers are not yet completed sales
+      }));
+
+      const recordResults = (closerRecordsData || []).map((r) => ({
+        type: 'record',
+        id: r.id,
+        customer_phone: r.customer_phone,
+        customer_name: r.customer_name,
+        customer_email: r.customer_email || null,
+        vin: r.vin || null,
+        company: r.companies?.display_name || r.companies?.name || 'N/A',
+        status: r.status,
+        disposition: r.dispositions?.label || null,
+        closer_name: r.closer?.full_name || 'Unknown',
+        created_at: r.created_at,
+        is_sold: r.dispositions?.label?.toLowerCase() === 'sold', // Determine if sold
+      }));
+
+      const results = [...transferResults, ...recordResults];
 
       res.json({ results, count: results.length });
     } catch (err) {
       console.error('Search error:', err);
-      res.status(500).json({ error: 'Search failed' });
+      res.status(500).json({ error: 'Search failed', details: process.env.NODE_ENV === 'development' ? err.message : undefined });
     }
   }
 );
