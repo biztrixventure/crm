@@ -67,7 +67,7 @@ router.get(
         recordFilter = (query) => query;
       } else if (role === 'compliance_agent') {
         // Agents can search records from their assigned batches only
-        // Get their assigned batches
+        // Get their assigned batches → compliance reviews → closer records
         try {
           const { data: batches, error: batchError } = await supabase
             .from('compliance_batches')
@@ -76,14 +76,34 @@ router.get(
 
           if (batchError) {
             console.error('Error fetching agent batches:', batchError);
-          } else if (batches && batches.length > 0) {
-            const batchIds = batches.map(b => b.id);
-            // For compliance agents, we'll filter records in the map phase
-            recordFilter = (query) => query.in('batch_id', batchIds);
-          } else {
+            return res.json({ results: [], count: 0 });
+          }
+
+          if (!batches || batches.length === 0) {
             // No batches assigned, return empty results
             return res.json({ results: [], count: 0 });
           }
+
+          const batchIds = batches.map(b => b.id);
+
+          // Get closer_record_ids from compliance_reviews for these batches
+          const { data: reviews, error: reviewError } = await supabase
+            .from('compliance_reviews')
+            .select('closer_record_id')
+            .in('batch_id', batchIds);
+
+          if (reviewError) {
+            console.error('Error fetching compliance reviews:', reviewError);
+            return res.json({ results: [], count: 0 });
+          }
+
+          if (!reviews || reviews.length === 0) {
+            return res.json({ results: [], count: 0 });
+          }
+
+          const recordIds = reviews.map(r => r.closer_record_id);
+          // Filter by records assigned to this agent's batches
+          recordFilter = (query) => query.in('id', recordIds);
         } catch (err) {
           console.error('Error in compliance agent batch lookup:', err);
           return res.json({ results: [], count: 0 });
@@ -154,7 +174,7 @@ router.get(
               closer_id,
               companies!closer_records_company_id_fkey (id, name, display_name),
               closer:users!closer_records_closer_id_fkey (id, full_name),
-              dispositions (id, label)
+              dispositions!closer_records_disposition_id_fkey (id, label)
             `
             )
             .ilike('customer_phone', `%${normalizedPhone}%`)
