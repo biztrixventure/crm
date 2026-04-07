@@ -260,7 +260,7 @@ router.get(
         disposition: r.dispositions?.label || null,
         closer_name: r.closer?.full_name || 'Unknown',
         created_at: r.created_at,
-        is_sold: r.dispositions?.label?.toLowerCase() === 'sold', // Determine if sold
+        is_sold: r.dispositions?.label?.toLowerCase() === 'sale made', // true if disposition = "Sale Made"
       }));
 
       const results = [...transferResults, ...recordResults];
