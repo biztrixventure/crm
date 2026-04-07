@@ -554,4 +554,91 @@ router.get('/:id/profile', async (req, res) => {
   }
 });
 
+// DELETE /users/:id - Delete a user with role-based authorization
+router.delete('/:id', async (req, res) => {
+  const { id: userIdToDelete } = req.params;
+  const { role: deleterRole, companyId: deleterCompanyId, id: deleterId } = req.user;
+
+  // Prevent self-deletion
+  if (userIdToDelete === deleterId) {
+    return res.status(403).json({ error: 'Cannot delete your own account' });
+  }
+
+  // Operations managers cannot delete anyone (read-only)
+  if (deleterRole === 'operations_manager') {
+    return res.status(403).json({ error: 'Operations managers cannot delete users (read-only access)' });
+  }
+
+  // Only these roles can delete users
+  if (!['super_admin', 'company_admin', 'closer_manager'].includes(deleterRole)) {
+    return res.status(403).json({ error: 'Not authorized to delete users' });
+  }
+
+  try {
+    // Fetch the user to be deleted
+    const { data: userToDelete, error: fetchError } = await supabase
+      .from('users')
+      .select('id, email, role, company_id, managed_by')
+      .eq('id', userIdToDelete)
+      .single();
+
+    if (fetchError || !userToDelete) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Authorization logic based on deleter role
+    if (deleterRole === 'super_admin') {
+      // Super admins can delete anyone except other super_admins or readonly_admins
+      if (['super_admin', 'readonly_admin'].includes(userToDelete.role)) {
+        return res.status(403).json({ error: 'Cannot delete super admins or readonly admins' });
+      }
+    } else if (deleterRole === 'company_admin') {
+      // Company admins can only delete users from their own company
+      // And cannot delete super_admin, readonly_admin, or other company_admins
+      if (!userToDelete.company_id || userToDelete.company_id !== deleterCompanyId) {
+        return res.status(403).json({ error: 'Cannot delete users from other companies' });
+      }
+      if (['super_admin', 'readonly_admin', 'company_admin'].includes(userToDelete.role)) {
+        return res.status(403).json({ error: 'Cannot delete super admins, readonly admins, or other company admins' });
+      }
+    } else if (deleterRole === 'closer_manager') {
+      // Closer managers can only delete closers they manage
+      if (userToDelete.role !== 'closer') {
+        return res.status(403).json({ error: 'Closer managers can only delete closers they manage' });
+      }
+      if (userToDelete.managed_by !== deleterId) {
+        return res.status(403).json({ error: 'Cannot delete closers not managed by you' });
+      }
+    }
+
+    // Delete from Supabase Auth first
+    try {
+      await supabase.auth.admin.deleteUser(userIdToDelete);
+    } catch (authError) {
+      console.error('Auth deletion error:', authError);
+      // Continue anyway - try to delete from database
+    }
+
+    // Delete from users table
+    const { error: dbError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userIdToDelete);
+
+    if (dbError) throw dbError;
+
+    res.json({
+      message: 'User deleted successfully',
+      user: {
+        id: userToDelete.id,
+        email: userToDelete.email,
+        role: userToDelete.role,
+      }
+    });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 export default router;

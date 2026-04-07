@@ -7,6 +7,7 @@ import {
   UsersIcon,
   XIcon,
   CheckIcon,
+  Trash2Icon as TrashIcon,
 } from 'lucide-animated';
 import api from '../../lib/axios';
 import { cn, formatDateTime, roleLabels } from '../../lib/utils';
@@ -147,6 +148,52 @@ export default function UsersPage() {
     }
   }
 
+  async function handleDelete(user) {
+    if (!window.confirm(`Are you sure you want to delete ${user.full_name} (${user.email})? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/users/${user.id}`);
+      toast.success(`User ${user.email} deleted successfully`);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      toast.error(error.response?.data?.error || 'Failed to delete user');
+    }
+  }
+
+  // Determine if current user can delete a specific user
+  function canDeleteUser(user) {
+    if (!canManage) return false;
+
+    const isSuperAdmin = currentUser?.role === 'super_admin';
+    const isCompanyAdmin = currentUser?.role === 'company_admin';
+    const isCloserManager = currentUser?.role === 'closer_manager';
+    const isOperationsManager = currentUser?.role === 'operations_manager';
+
+    // Operations managers cannot delete anyone (read-only)
+    if (isOperationsManager) return false;
+
+    // Super admins cannot delete other super admins or readonly admins
+    if (isSuperAdmin) {
+      return !['super_admin', 'readonly_admin'].includes(user.role);
+    }
+
+    // Company admins can delete users from their company (except super admin, readonly admin, or other company admins)
+    if (isCompanyAdmin) {
+      if (user.company_id !== currentUser?.companyId) return false;
+      return !['super_admin', 'readonly_admin', 'company_admin'].includes(user.role);
+    }
+
+    // Closer managers can only delete closers they manage
+    if (isCloserManager) {
+      return user.role === 'closer' && user.managed_by === currentUser?.id;
+    }
+
+    return false;
+  }
+
   const filteredUsers = users.filter((u) => {
     const q = searchTerm.toLowerCase();
     const companyName = u.companies?.display_name || '';
@@ -277,6 +324,16 @@ export default function UsersPage() {
                         >
                           {u.is_active ? 'Deactivate' : 'Activate'}
                         </button>
+                        {canDeleteUser(u) && (
+                          <button
+                            onClick={() => handleDelete(u)}
+                            className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform hover:bg-red-200 dark:hover:bg-red-900/50"
+                            title={`Delete ${u.full_name}`}
+                          >
+                            <TrashIcon size={14} />
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   )}
