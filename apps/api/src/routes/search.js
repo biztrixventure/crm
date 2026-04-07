@@ -25,6 +25,7 @@ router.get(
   roleGuard('super_admin', 'company_admin', 'closer', 'closer_manager', 'compliance_manager', 'compliance_agent', 'operations_manager'),
   async (req, res) => {
     const { phone } = req.query;
+    const { id: userId, role, companyId } = req.user;
 
     if (!phone || !phone.trim()) {
       return res.status(400).json({ error: 'Phone number is required' });
@@ -37,74 +38,142 @@ router.get(
         return res.status(400).json({ error: 'Invalid phone number format' });
       }
 
-      // Search in multiple places separately to handle errors gracefully
       let transfersData = [];
       let closerRecordsData = [];
 
-      // Search transfers
-      try {
-        const { data, error } = await supabase
-          .from('transfers')
-          .select(
-            `
-            id,
-            customer_phone,
-            customer_name,
-            company_id,
-            closer_id,
-            fronter_id,
-            status,
-            created_at,
-            companies!transfers_company_id_fkey (id, name, display_name),
-            closer:users!transfers_closer_id_fkey (id, full_name),
-            fronter:users!transfers_fronter_id_fkey (id, full_name)
-          `
-          )
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('created_at', { ascending: false })
-          .limit(10);
+      // Build filters based on user role
+      let transferFilter = null;
+      let recordFilter = null;
 
-        if (error) {
-          console.error('Transfers search error:', error);
-        } else if (data) {
-          transfersData = data;
+      if (role === 'closer') {
+        // Closers can only search their own records/transfers
+        transferFilter = (query) => query.eq('closer_id', userId);
+        recordFilter = (query) => query.eq('closer_id', userId);
+      } else if (role === 'closer_manager') {
+        // Closer managers can search ALL closers' records (they manage all closers)
+        // No filter needed - they can see all closer records
+        transferFilter = (query) => query;
+        recordFilter = (query) => query;
+      } else if (role === 'company_admin') {
+        // Company admins can only search their company's records
+        if (!companyId) {
+          return res.status(403).json({ error: 'Company admin missing company_id' });
         }
-      } catch (err) {
-        console.error('Transfers query exception:', err);
+        transferFilter = (query) => query.eq('company_id', companyId);
+        recordFilter = (query) => query.eq('company_id', companyId);
+      } else if (role === 'compliance_manager' || role === 'operations_manager') {
+        // These roles can search all records
+        transferFilter = (query) => query;
+        recordFilter = (query) => query;
+      } else if (role === 'compliance_agent') {
+        // Agents can search records from their assigned batches only
+        // Get their assigned batches
+        try {
+          const { data: batches, error: batchError } = await supabase
+            .from('compliance_batches')
+            .select('id')
+            .eq('assigned_to', userId);
+
+          if (batchError) {
+            console.error('Error fetching agent batches:', batchError);
+          } else if (batches && batches.length > 0) {
+            const batchIds = batches.map(b => b.id);
+            // For compliance agents, we'll filter records in the map phase
+            recordFilter = (query) => query.in('batch_id', batchIds);
+          } else {
+            // No batches assigned, return empty results
+            return res.json({ results: [], count: 0 });
+          }
+        } catch (err) {
+          console.error('Error in compliance agent batch lookup:', err);
+          return res.json({ results: [], count: 0 });
+        }
+        // Transfers are not relevant for compliance agents
+        transferFilter = () => null;
+      } else if (role === 'super_admin') {
+        // Super admins can search all records
+        transferFilter = (query) => query;
+        recordFilter = (query) => query;
       }
 
-      // Search closer records
-      try {
-        const { data, error } = await supabase
-          .from('closer_records')
-          .select(
+      // Search transfers with filter
+      if (transferFilter) {
+        try {
+          let query = supabase
+            .from('transfers')
+            .select(
+              `
+              id,
+              customer_phone,
+              customer_name,
+              company_id,
+              closer_id,
+              fronter_id,
+              status,
+              created_at,
+              companies!transfers_company_id_fkey (id, name, display_name),
+              closer:users!transfers_closer_id_fkey (id, full_name),
+              fronter:users!transfers_fronter_id_fkey (id, full_name)
             `
-            id,
-            customer_phone,
-            customer_name,
-            customer_email,
-            vin,
-            record_date,
-            status,
-            created_at,
-            company_id,
-            closer_id,
-            companies!closer_records_company_id_fkey (id, name, display_name),
-            closer:users!closer_records_closer_id_fkey (id, full_name),
-            dispositions (id, label)
-          `
-          )
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('created_at', { ascending: false })
-          .limit(10);
+            )
+            .ilike('customer_phone', `%${normalizedPhone}%`)
+            .order('created_at', { ascending: false })
+            .limit(10);
 
-        if (error) {
-          console.error('Closer records search error:', error);
-        } else if (data) {
-          closerRecordsData = data;
+          // Apply role-based filter
+          query = transferFilter(query);
+          if (query) {
+            const { data, error } = await query;
+            if (error) {
+              console.error('Transfers search error:', error);
+            } else if (data) {
+              transfersData = data;
+            }
+          }
+        } catch (err) {
+          console.error('Transfers query exception:', err);
         }
-      } catch (err) {
-        console.error('Closer records query exception:', err);
+      }
+
+      // Search closer records with filter
+      if (recordFilter) {
+        try {
+          let query = supabase
+            .from('closer_records')
+            .select(
+              `
+              id,
+              customer_phone,
+              customer_name,
+              customer_email,
+              vin,
+              record_date,
+              status,
+              created_at,
+              company_id,
+              closer_id,
+              companies!closer_records_company_id_fkey (id, name, display_name),
+              closer:users!closer_records_closer_id_fkey (id, full_name),
+              dispositions (id, label)
+            `
+            )
+            .ilike('customer_phone', `%${normalizedPhone}%`)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          // Apply role-based filter
+          query = recordFilter(query);
+          if (query) {
+            const { data, error } = await query;
+            if (error) {
+              console.error('Closer records search error:', error);
+            } else if (data) {
+              closerRecordsData = data;
+            }
+          }
+        } catch (err) {
+          console.error('Closer records query exception:', err);
+        }
       }
 
       // Safely map results
