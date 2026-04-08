@@ -7,8 +7,8 @@ import {
   UsersIcon,
   XIcon,
   CheckIcon,
-  Trash2Icon as TrashIcon,
 } from 'lucide-animated';
+import { Trash2 as TrashIcon } from 'lucide-react';
 import api from '../../lib/axios';
 import { cn, formatDateTime, roleLabels } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth';
