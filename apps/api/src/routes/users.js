@@ -700,4 +700,159 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// DELETE /users/:id/force - Force delete a user (SUPER ADMIN ONLY)
+// Orphans related records so deletion can proceed
+router.delete('/:id/force', async (req, res) => {
+  const { id: userIdToDelete } = req.params;
+  const { role: deleterRole, id: deleterId } = req.user;
+
+  // Only super_admin can force delete
+  if (deleterRole !== 'super_admin') {
+    return res.status(403).json({ error: 'Only super admins can force delete users' });
+  }
+
+  // Prevent self-deletion
+  if (userIdToDelete === deleterId) {
+    return res.status(403).json({ error: 'Cannot delete your own account' });
+  }
+
+  try {
+    // Fetch the user to be deleted
+    const { data: userToDelete, error: fetchError } = await supabase
+      .from('users')
+      .select('id, email, role, company_id')
+      .eq('id', userIdToDelete)
+      .single();
+
+    if (fetchError || !userToDelete) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Cannot force delete super_admin or readonly_admin
+    if (['super_admin', 'readonly_admin'].includes(userToDelete.role)) {
+      return res.status(403).json({ error: 'Cannot delete super admins or readonly admins' });
+    }
+
+    console.log(`🗑️ Force deleting user: ${userToDelete.email} (${userToDelete.role})`);
+
+    // Step 1: Orphan all related records by setting closer_id/fronter_id to NULL
+    console.log('   Step 1: Orphaning related records...');
+
+    const orphanQueries = [];
+
+    // Orphan outcomes (set closer_id to NULL)
+    if (userToDelete.role === 'closer' || true) {
+      orphanQueries.push(
+        supabase
+          .from('outcomes')
+          .update({ closer_id: null })
+          .eq('closer_id', userIdToDelete)
+      );
+    }
+
+    // Orphan transfers from fronter
+    if (userToDelete.role === 'fronter' || true) {
+      orphanQueries.push(
+        supabase
+          .from('transfers')
+          .update({ fronter_id: null })
+          .eq('fronter_id', userIdToDelete)
+      );
+    }
+
+    // Orphan transfers assigned to closer
+    if (userToDelete.role === 'closer' || true) {
+      orphanQueries.push(
+        supabase
+          .from('transfers')
+          .update({ closer_id: null })
+          .eq('closer_id', userIdToDelete)
+      );
+    }
+
+    // Orphan closer_records
+    if (userToDelete.role === 'closer' || true) {
+      orphanQueries.push(
+        supabase
+          .from('closer_records')
+          .update({ closer_id: null })
+          .eq('closer_id', userIdToDelete)
+      );
+    }
+
+    // Orphan compliance batches (set assigned_to to NULL)
+    orphanQueries.push(
+      supabase
+        .from('compliance_batches')
+        .update({ assigned_to: null })
+        .eq('assigned_to', userIdToDelete)
+    );
+
+    // Orphan compliance reviews (set reviewed_by to NULL)
+    orphanQueries.push(
+      supabase
+        .from('compliance_reviews')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userIdToDelete)
+    );
+
+    // Execute all orphaning queries in parallel
+    const orphanResults = await Promise.all(orphanQueries);
+    const orphanErrors = orphanResults.filter(r => r.error);
+
+    if (orphanErrors.length > 0) {
+      console.warn('   ⚠️ Some orphaning queries failed:', orphanErrors);
+      // Continue anyway - try to delete the user
+    } else {
+      console.log('   ✅ Records orphaned successfully');
+    }
+
+    // Step 2: Delete from Supabase Auth
+    console.log('   Step 2: Deleting auth user...');
+    try {
+      await supabase.auth.admin.deleteUser(userIdToDelete);
+      console.log('   ✅ Auth user deleted');
+    } catch (authError) {
+      console.error('   ⚠️ Auth deletion error:', authError);
+      // Continue anyway - user record might still be in db to clean up
+    }
+
+    // Step 3: Delete from users table
+    console.log('   Step 3: Deleting from users table...');
+    const { error: dbError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userIdToDelete);
+
+    if (dbError) {
+      console.error('   ❌ Database deletion error:', dbError);
+      throw dbError;
+    }
+
+    console.log(`✅ User force deleted: ${userToDelete.email}\n`);
+
+    res.json({
+      message: 'User force deleted successfully',
+      user: {
+        id: userToDelete.id,
+        email: userToDelete.email,
+        role: userToDelete.role,
+      },
+      orphanedRecords: {
+        outcomes: 'Set closer_id to NULL',
+        transfers: 'Set fronter_id/closer_id to NULL',
+        closerRecords: 'Set closer_id to NULL',
+        complianceBatches: 'Set assigned_to to NULL',
+        complianceReviews: 'Set reviewed_by to NULL',
+      }
+    });
+  } catch (err) {
+    console.error('Force delete user error:', err);
+    res.status(500).json({
+      error: 'Failed to force delete user',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
 export default router;

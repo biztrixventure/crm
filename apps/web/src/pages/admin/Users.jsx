@@ -176,6 +176,28 @@ export default function UsersPage() {
     }
   }
 
+  async function handleForceDelete(user) {
+    const confirmMsg = `FORCE DELETE: ${user.full_name} (${user.email})\n\nThis will:\n- Orphan all their records (set closer_id/fronter_id to NULL)\n- Delete their auth account\n- Remove them from the system\n\nThis action CANNOT be undone. Are you certain?`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/users/${user.id}/force`);
+      toast.success(`User force deleted! Records orphaned:`, {
+        duration: 5000,
+      });
+      toast.success(`${user.email} removed from system`, {
+        duration: 3000,
+      });
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to force delete user:', error);
+      toast.error(error.response?.data?.error || 'Failed to force delete user');
+    }
+  }
+
   // Determine if current user can delete a specific user
   function canDeleteUser(user) {
     if (!canManage) return false;
@@ -338,14 +360,26 @@ export default function UsersPage() {
                           {u.is_active ? 'Deactivate' : 'Activate'}
                         </button>
                         {canDeleteUser(u) && (
-                          <button
-                            onClick={() => handleDelete(u)}
-                            className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform hover:bg-red-200 dark:hover:bg-red-900/50"
-                            title={`Delete ${u.full_name}`}
-                          >
-                            <TrashIcon size={14} />
-                            Delete
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleDelete(u)}
+                              className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform hover:bg-red-200 dark:hover:bg-red-900/50"
+                              title={`Delete ${u.full_name}`}
+                            >
+                              <TrashIcon size={14} />
+                              Delete
+                            </button>
+                            {isSuperAdmin && !['super_admin', 'readonly_admin'].includes(u.role) && (
+                              <button
+                                onClick={() => handleForceDelete(u)}
+                                className="px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform hover:bg-orange-200 dark:hover:bg-orange-900/50"
+                                title={`Force delete ${u.full_name} (will orphan records)`}
+                              >
+                                <TrashIcon size={14} />
+                                Force Delete
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
