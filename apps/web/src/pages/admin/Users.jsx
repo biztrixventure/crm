@@ -75,7 +75,7 @@ export default function UsersPage() {
   }
 
   async function fetchCompaniesIfNeeded() {
-    if (!isSuperAdmin || companies.length > 0) return;
+    if (!isSuperAdmin || managers.length > 0) return; // Check managers, not companies
     try {
       const companiesRes = await api.get('/companies', { timeout: 15000 });
       setCompanies(companiesRes.data.companies || []);
