@@ -29,6 +29,7 @@ router.get('/', roleGuard('super_admin', 'readonly_admin', 'closer', 'closer_man
         display_name,
         slug,
         is_active,
+        feature_flags,
         created_at,
         users!users_company_id_fkey (count)
       `)
