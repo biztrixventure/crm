@@ -93,10 +93,32 @@ router.get(
           return res.json({ results: [], count: 0 });
         }
       } else if (role === 'company_admin') {
-        // Company admins can only search their company's records
+        // Company admins can only search their company's records if feature flag is enabled
         if (!companyId) {
           return res.status(403).json({ error: 'Company admin missing company_id' });
         }
+
+        // Check if company has number_search feature enabled
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select('feature_flags')
+          .eq('id', companyId)
+          .single();
+
+        if (companyError || !company) {
+          console.error('Error fetching company:', companyError);
+          return res.status(403).json({ error: 'Company not found' });
+        }
+
+        if (!company.feature_flags?.number_search) {
+          return res.status(403).json({
+            error: 'Number search capability is not enabled for your company',
+            authorized: false
+          });
+        }
+
+        // Load company's feature flags for later use
+        req.companyFeatureFlags = company.feature_flags;
         transferFilter = (query) => query.eq('company_id', companyId);
         recordFilter = (query) => query.eq('company_id', companyId);
       } else if (role === 'compliance_manager' || role === 'operations_manager') {
@@ -272,12 +294,31 @@ router.get(
 
       const results = [...transferResults, ...recordResults];
 
+      // Apply feature flag filtering if company has restrictions
+      let filteredResults = results;
+      if (req.companyFeatureFlags) {
+        // If company has record_visibility_restrictions, only show sold records (compliance feature)
+        if (req.companyFeatureFlags.record_visibility_restrictions) {
+          filteredResults = results.filter(r => {
+            // Only show records (not transfers) and only sold records
+            return r.type === 'record' && r.is_sold;
+          });
+          console.log(`   After record_visibility_restrictions filter: ${filteredResults.length}`);
+        }
+
+        // If company has sold_disposition_only flag, only show sold records
+        if (req.companyFeatureFlags.sold_disposition_only) {
+          filteredResults = filteredResults.filter(r => r.is_sold);
+          console.log(`   After sold_disposition_only filter: ${filteredResults.length}`);
+        }
+      }
+
       console.log(`✅ SEARCH COMPLETE:`);
       console.log(`   Transfers: ${transferResults.length}`);
       console.log(`   Records: ${recordResults.length}`);
-      console.log(`   Total: ${results.length}`);
+      console.log(`   Total After Filters: ${filteredResults.length}`);
 
-      res.json({ results, count: results.length });
+      res.json({ results: filteredResults, count: filteredResults.length });
     } catch (err) {
       console.error('Search error:', err);
       res.status(500).json({ error: 'Search failed', details: process.env.NODE_ENV === 'development' ? err.message : undefined });

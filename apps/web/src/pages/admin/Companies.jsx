@@ -31,9 +31,12 @@ export default function Companies() {
     display_name: '',
     slug: '',
     feature_flags: {
-      enableCallbacks: true,
-      enableNumberLists: true,
-      maxTransfersPerDay: 1000,
+      number_search: false,
+      allow_edit: false,
+      allow_export: false,
+      custom_dispositions: false,
+      record_visibility_restrictions: false,
+      sold_disposition_only: false,
     },
     is_active: true,
   });
@@ -332,46 +335,121 @@ export default function Companies() {
               <div className="bg-cream-100 dark:bg-dark-800 rounded-xl p-4">
                 <h3 className="font-semibold text-primary-800 dark:text-primary-200 mb-3 flex items-center gap-2">
                   <SettingsIcon size={20} />
-                  Feature Flags
+                  Business Logic Controls
                 </h3>
                 <div className="space-y-3">
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={formData.feature_flags.enableCallbacks}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        feature_flags: { ...formData.feature_flags, enableCallbacks: e.target.checked }
-                      })}
-                      className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
-                    />
-                    <span className="text-sm text-primary-700">Enable Callbacks</span>
-                  </label>
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={formData.feature_flags.enableNumberLists}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        feature_flags: { ...formData.feature_flags, enableNumberLists: e.target.checked }
-                      })}
-                      className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
-                    />
-                    <span className="text-sm text-primary-700">Enable Number Lists</span>
-                  </label>
-                  <div>
-                    <label className="block text-sm text-primary-700 mb-1">
-                      Max Transfers Per Day
+                  {/* Search Capability */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.number_search || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, number_search: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Enable Number Search</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Allow company to search/view number history (sold/not sold status)</p>
+                      </div>
                     </label>
-                    <input
-                      type="number"
-                      value={formData.feature_flags.maxTransfersPerDay}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        feature_flags: { ...formData.feature_flags, maxTransfersPerDay: parseInt(e.target.value) }
-                      })}
-                      className="w-full px-4 py-2 rounded-xl border-2 border-cream-300 bg-white text-primary-800 focus:ring-2 focus:ring-primary-400 focus:border-primary-400 transition-all"
-                    />
+                  </div>
+
+                  {/* Record Visibility */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.record_visibility_restrictions || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, record_visibility_restrictions: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Record Visibility Restrictions</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Limit company view to only assigned records</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Sold Disposition Only */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.sold_disposition_only || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, sold_disposition_only: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Show Only Sold Records</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Only display records with "Sold" disposition</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Edit Permission */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.allow_edit || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, allow_edit: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Allow Record Edit</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Allow editing of submitted records</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Export Permission */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.allow_export || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, allow_export: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Allow Export</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Allow exporting records to CSV/Excel</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Custom Dispositions */}
+                  <div className="border border-cream-200 dark:border-dark-700 rounded-lg p-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feature_flags.custom_dispositions || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          feature_flags: { ...formData.feature_flags, custom_dispositions: e.target.checked }
+                        })}
+                        className="w-5 h-5 rounded border-cream-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-primary-700 dark:text-primary-300">Custom Dispositions</p>
+                        <p className="text-xs text-primary-500 dark:text-primary-400">Allow company-specific disposition types</p>
+                      </div>
+                    </label>
                   </div>
                 </div>
               </div>

@@ -13,6 +13,8 @@ export const createCompanySchema = z.object({
     allow_edit: z.boolean().default(false),
     allow_export: z.boolean().default(false),
     custom_dispositions: z.boolean().default(false),
+    record_visibility_restrictions: z.boolean().default(false),
+    sold_disposition_only: z.boolean().default(false),
   }).optional(),
 });
 
@@ -31,6 +33,8 @@ export const updateCompanySchema = z.object({
     allow_edit: z.boolean().optional(),
     allow_export: z.boolean().optional(),
     custom_dispositions: z.boolean().optional(),
+    record_visibility_restrictions: z.boolean().optional(),
+    sold_disposition_only: z.boolean().optional(),
   }).optional(),
 });
 
