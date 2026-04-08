@@ -195,22 +195,77 @@ router.patch('/:id', roleGuard('super_admin'), validate(updateCompanySchema), as
   }
 });
 
-// DELETE /companies/:id - Soft delete company (Super Admin only)
+// DELETE /companies/:id - Hard delete company (Super Admin only)
 router.delete('/:id', roleGuard('super_admin'), async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Step 1: Delete all related records in cascade order
+    console.log(`🗑️ Force deleting company: ${id}`);
+    console.log('   Step 1: Deleting related records...');
+
+    // Delete transfers for this company
+    await supabase
+      .from('transfers')
+      .delete()
+      .eq('company_id', id);
+
+    // Delete outcomes for this company
+    await supabase
+      .from('outcomes')
+      .delete()
+      .eq('company_id', id);
+
+    // Delete closer_records for this company
+    await supabase
+      .from('closer_records')
+      .delete()
+      .eq('company_id', id);
+
+    // Delete callbacks for this company
+    await supabase
+      .from('callbacks')
+      .delete()
+      .eq('company_id', id);
+
+    // Delete users for this company (except their records which we already deleted)
+    const { data: companyUsers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('company_id', id);
+
+    if (companyUsers && companyUsers.length > 0) {
+      const userIds = companyUsers.map(u => u.id);
+
+      // Delete audit logs for these users
+      await supabase
+        .from('audit_logs')
+        .delete()
+        .in('user_id', userIds);
+
+      // Delete users
+      await supabase
+        .from('users')
+        .delete()
+        .in('id', userIds);
+    }
+
+    console.log('   ✅ Related records deleted');
+
+    // Step 2: Delete the company itself
+    console.log('   Step 2: Deleting company...');
     const { error } = await supabase
       .from('companies')
-      .update({ is_active: false })
+      .delete()
       .eq('id', id);
 
     if (error) throw error;
 
-    res.json({ message: 'Company deactivated successfully' });
+    console.log(`✅ Company deleted: ${id}\n`);
+    res.json({ message: 'Company deleted successfully' });
   } catch (err) {
     console.error('Delete company error:', err);
-    res.status(500).json({ error: 'Failed to deactivate company' });
+    res.status(500).json({ error: 'Failed to delete company' });
   }
 });
 

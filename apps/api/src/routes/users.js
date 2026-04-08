@@ -599,6 +599,8 @@ router.get('/:id/profile', async (req, res) => {
 });
 
 // DELETE /users/:id - Delete a user with role-based authorization
+// Super admin: can delete anyone (with or without records) except themselves/other super admins
+// Others: normal delete (fails if user has records)
 router.delete('/:id', async (req, res) => {
   const { id: userIdToDelete } = req.params;
   const { role: deleterRole, companyId: deleterCompanyId, id: deleterId } = req.user;
@@ -636,9 +638,92 @@ router.delete('/:id', async (req, res) => {
       if (['super_admin', 'readonly_admin'].includes(userToDelete.role)) {
         return res.status(403).json({ error: 'Cannot delete super admins or readonly admins' });
       }
+
+      // For super admin: use force delete logic (cascade delete all records)
+      console.log(`🗑️ Super admin force deleting user: ${userToDelete.email} (${userToDelete.role})`);
+      console.log('   Step 1: Deleting related records in cascade order...');
+
+      const deleteQueries = [];
+
+      // 1. Delete audit logs
+      deleteQueries.push(
+        supabase.from('audit_logs').delete().eq('user_id', userIdToDelete)
+      );
+
+      // 2. Delete callbacks
+      deleteQueries.push(
+        supabase.from('callbacks').delete().eq('created_by', userIdToDelete)
+      );
+
+      // 3. Delete outcomes
+      deleteQueries.push(
+        supabase.from('outcomes').delete().eq('closer_id', userIdToDelete)
+      );
+
+      // 4. Delete transfers
+      deleteQueries.push(
+        supabase
+          .from('transfers')
+          .delete()
+          .or(`fronter_id.eq.${userIdToDelete},closer_id.eq.${userIdToDelete}`)
+      );
+
+      // 5. Delete closer_records
+      deleteQueries.push(
+        supabase.from('closer_records').delete().eq('closer_id', userIdToDelete)
+      );
+
+      // 6. Delete compliance reviews
+      deleteQueries.push(
+        supabase.from('compliance_reviews').delete().eq('reviewed_by', userIdToDelete)
+      );
+
+      // 7. Delete compliance batches
+      deleteQueries.push(
+        supabase.from('compliance_batches').delete().eq('assigned_to', userIdToDelete)
+      );
+
+      // Execute all deletes
+      await Promise.allSettled(deleteQueries);
+      console.log('   ✅ Related records deleted');
+
+      // Clear created_by references
+      console.log('   Step 2: Clearing created_by references...');
+      await supabase
+        .from('users')
+        .update({ created_by: null })
+        .eq('created_by', userIdToDelete);
+      console.log('   ✅ Created_by cleared');
+
+      // Delete from auth
+      console.log('   Step 3: Deleting auth user...');
+      try {
+        await supabase.auth.admin.deleteUser(userIdToDelete);
+        console.log('   ✅ Auth user deleted');
+      } catch (authError) {
+        console.warn('   ⚠️ Auth deletion error:', authError.message);
+      }
+
+      // Delete from users table
+      console.log('   Step 4: Deleting from users table...');
+      const { error: dbError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userIdToDelete);
+
+      if (dbError) throw dbError;
+
+      console.log(`✅ User force deleted: ${userToDelete.email}\n`);
+      return res.json({
+        message: 'User deleted successfully',
+        user: {
+          id: userToDelete.id,
+          email: userToDelete.email,
+          role: userToDelete.role,
+        }
+      });
     } else if (deleterRole === 'company_admin') {
       // Company admins can only delete users from their own company
-      // And cannot delete super_admin, readonly_admin, or other company_admins
       if (!userToDelete.company_id || userToDelete.company_id !== deleterCompanyId) {
         return res.status(403).json({ error: 'Cannot delete users from other companies' });
       }
@@ -655,12 +740,13 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
+    // Non-super-admin delete (regular soft/hard delete based on records)
     // Delete from Supabase Auth first
     try {
       await supabase.auth.admin.deleteUser(userIdToDelete);
     } catch (authError) {
       console.error('Auth deletion error:', authError);
-      // Continue anyway - try to delete from database
+      // Continue anyway
     }
 
     // Delete from users table
@@ -672,12 +758,11 @@ router.delete('/:id', async (req, res) => {
     if (dbError) {
       // Handle foreign key constraint violation
       if (dbError.code === '23503') {
-        // User has related records (outcomes, transfers, etc.)
+        // User has related records
         return res.status(409).json({
           error: 'Cannot delete user with existing records',
-          message: 'This user has associated outcomes or records that must be deleted first, or use deactivation instead.',
-          suggestion: 'Consider deactivating the user instead: PATCH /users/:id with { "is_active": false }',
-          details: dbError.message,
+          message: 'This user has associated records. Super admin can force delete, or deactivate this user instead.',
+          suggestion: 'Contact super admin for force delete, or deactivate: PATCH /users/:id with { "is_active": false }',
         });
       }
       throw dbError;
