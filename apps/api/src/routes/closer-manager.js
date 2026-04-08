@@ -175,19 +175,30 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
   const { email, full_name, password } = req.body;
   const { id: creatorId } = req.user;
 
+  console.log('📝 Creating closer:');
+  console.log(`   Email: ${email}`);
+  console.log(`   Full Name: ${full_name}`);
+  console.log(`   Creator ID: ${creatorId}`);
+
   try {
     // Create user in Supabase Auth
+    console.log('   Step 1: Creating auth user...');
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      console.error('   ❌ Auth error:', authError);
+      throw authError;
+    }
 
     const userId = authData.user.id;
+    console.log(`   ✅ Auth user created: ${userId}`);
 
     // Create user record with role = 'closer', company_id = null, and managed_by = creatorId
+    console.log('   Step 2: Inserting into database...');
     const { data: userRecord, error: userError } = await supabase
       .from('users')
       .insert([
@@ -204,23 +215,46 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
       ])
       .select();
 
-    if (userError) throw userError;
+    if (userError) {
+      console.error('   ❌ Database error:', userError);
+      // Rollback: delete auth user
+      console.log('   Rolling back: Deleting auth user...');
+      await supabase.auth.admin.deleteUser(userId);
+      throw userError;
+    }
+
+    console.log('   ✅ User inserted successfully');
 
     // Notify manager of new closer creation
-    await notifyCloserManagerEvent({
-      eventType: 'new_closer_created',
-      message: `New closer account created: ${full_name}`,
-      userId: creatorId,
-      closerId: userId,
-    });
+    console.log('   Step 3: Sending notification...');
+    try {
+      await notifyCloserManagerEvent({
+        eventType: 'new_closer_created',
+        message: `New closer account created: ${full_name}`,
+        userId: creatorId,
+        closerId: userId,
+      });
+      console.log('   ✅ Notification sent');
+    } catch (notifyErr) {
+      console.warn('   ⚠️  Notification failed (non-critical):', notifyErr.message);
+    }
 
+    console.log('✅ Closer created successfully\n');
     res.status(201).json({
       closer: userRecord[0],
       message: 'Closer account created successfully',
     });
   } catch (err) {
-    console.error('Create closer error:', err);
-    res.status(500).json({ error: 'Failed to create closer account' });
+    console.error('❌ Create closer error:', err);
+    console.error('   Error details:', {
+      message: err.message,
+      code: err.code,
+      status: err.status,
+    });
+    res.status(500).json({
+      error: 'Failed to create closer account',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
   }
 });
 
