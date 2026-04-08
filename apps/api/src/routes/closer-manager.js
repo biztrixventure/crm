@@ -4,27 +4,13 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { notifyCloserManagerEvent, notifySaleMade } from '../services/notification.js';
+import { createCloserSchema } from '../schemas/closer-manager.schema.js';
 
 const router = Router();
 
 // All routes require authentication and closer_manager role
 router.use(authenticate);
 router.use(roleGuard('closer_manager'));
-
-// ============================================================
-// SCHEMA DEFINITIONS
-// ============================================================
-
-const createCloserSchema = {
-  type: 'object',
-  required: ['email', 'full_name', 'password'],
-  properties: {
-    email: { type: 'string', format: 'email' },
-    full_name: { type: 'string', minLength: 1 },
-    password: { type: 'string', minLength: 8 },
-  },
-  additionalProperties: false,
-};
 
 // ============================================================
 // HELPER FUNCTIONS
