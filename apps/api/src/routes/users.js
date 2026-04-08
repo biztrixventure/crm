@@ -634,7 +634,19 @@ router.delete('/:id', async (req, res) => {
       .delete()
       .eq('id', userIdToDelete);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      // Handle foreign key constraint violation
+      if (dbError.code === '23503') {
+        // User has related records (outcomes, transfers, etc.)
+        return res.status(409).json({
+          error: 'Cannot delete user with existing records',
+          message: 'This user has associated outcomes or records that must be deleted first, or use deactivation instead.',
+          suggestion: 'Consider deactivating the user instead: PATCH /users/:id with { "is_active": false }',
+          details: dbError.message,
+        });
+      }
+      throw dbError;
+    }
 
     res.json({
       message: 'User deleted successfully',
@@ -646,7 +658,10 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Delete user error:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
+    res.status(500).json({
+      error: 'Failed to delete user',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
   }
 });
 
