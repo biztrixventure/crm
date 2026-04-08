@@ -92,7 +92,10 @@ function Overview() {
           </p>
         </div>
         {user.featureFlags?.allow_export && (
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+          <button
+            onClick={() => handleExport(user.companyId, 'transfers')}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+          >
             <Download className="w-4 h-4" />
             Export
           </button>

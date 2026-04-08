@@ -90,7 +90,14 @@ export default function Companies() {
       name: company.name,
       display_name: company.display_name,
       slug: company.slug,
-      feature_flags: company.feature_flags || {},
+      feature_flags: {
+        number_search: company.feature_flags?.number_search ?? false,
+        allow_edit: company.feature_flags?.allow_edit ?? false,
+        allow_export: company.feature_flags?.allow_export ?? false,
+        custom_dispositions: company.feature_flags?.custom_dispositions ?? false,
+        record_visibility_restrictions: company.feature_flags?.record_visibility_restrictions ?? false,
+        sold_disposition_only: company.feature_flags?.sold_disposition_only ?? false,
+      },
       is_active: company.is_active,
     });
     setShowModal(true);

@@ -327,7 +327,8 @@ router.get('/:id/stats', roleGuard('super_admin', 'readonly_admin', 'company_adm
       supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('disposition_id', saleDisposition?.id),
       supabase.from('outcomes').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('disposition_id', saleDisposition?.id).gte('created_at', today.toISOString()),
       supabase.from('callbacks').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('is_fired', false),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('is_active', true),
+      // Count only fronters who are active
+      supabase.from('users').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('role', 'fronter').eq('is_active', true),
     ]);
 
     res.json({
@@ -442,9 +443,14 @@ router.get('/:id/activity', roleGuard('super_admin', 'readonly_admin'), async (r
 });
 
 // GET /companies/:id/export - Export company data as CSV
-router.get('/:id/export', roleGuard('super_admin'), async (req, res) => {
+router.get('/:id/export', roleGuard('super_admin', 'company_admin'), async (req, res) => {
   const { id } = req.params;
   const { type = 'transfers', days = 30 } = req.query;
+
+  // Company admins can only export their own company
+  if (req.user.role === 'company_admin' && req.user.companyId !== id) {
+    return res.status(403).json({ error: 'Cannot export from other companies' });
+  }
 
   try {
     const startDate = new Date();
