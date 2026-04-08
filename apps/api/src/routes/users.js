@@ -735,38 +735,31 @@ router.delete('/:id/force', async (req, res) => {
 
     console.log(`🗑️ Force deleting user: ${userToDelete.email} (${userToDelete.role})`);
 
-    // Step 1: Delete all related records (cascade delete)
-    console.log('   Step 1: Deleting related records...');
+    // Step 1: Delete all related records (cascade delete in proper order)
+    console.log('   Step 1: Deleting related records in cascade order...');
 
     const deleteQueries = [];
 
-    // Delete compliance reviews where this user reviewed
+    // 1. Delete audit logs for this user
+    console.log('     - Deleting audit logs...');
     deleteQueries.push(
-      supabase
-        .from('compliance_reviews')
-        .delete()
-        .eq('reviewed_by', userIdToDelete)
+      supabase.from('audit_logs').delete().eq('user_id', userIdToDelete)
     );
 
-    // Delete compliance batches assigned to this user
+    // 2. Delete callbacks created by this user
+    console.log('     - Deleting callbacks...');
     deleteQueries.push(
-      supabase
-        .from('compliance_batches')
-        .delete()
-        .eq('assigned_to', userIdToDelete)
+      supabase.from('callbacks').delete().eq('created_by', userIdToDelete)
     );
 
-    // Delete outcomes
-    if (userToDelete.role === 'closer' || true) {
-      deleteQueries.push(
-        supabase
-          .from('outcomes')
-          .delete()
-          .eq('closer_id', userIdToDelete)
-      );
-    }
+    // 3. Delete outcomes (they reference transfers)
+    console.log('     - Deleting outcomes...');
+    deleteQueries.push(
+      supabase.from('outcomes').delete().eq('closer_id', userIdToDelete)
+    );
 
-    // Delete transfers
+    // 4. Delete transfers (references users)
+    console.log('     - Deleting transfers...');
     deleteQueries.push(
       supabase
         .from('transfers')
@@ -774,29 +767,51 @@ router.delete('/:id/force', async (req, res) => {
         .or(`fronter_id.eq.${userIdToDelete},closer_id.eq.${userIdToDelete}`)
     );
 
-    // Delete closer_records
-    if (userToDelete.role === 'closer' || true) {
-      deleteQueries.push(
-        supabase
-          .from('closer_records')
-          .delete()
-          .eq('closer_id', userIdToDelete)
-      );
-    }
+    // 5. Delete closer_records
+    console.log('     - Deleting closer records...');
+    deleteQueries.push(
+      supabase.from('closer_records').delete().eq('closer_id', userIdToDelete)
+    );
 
-    // Execute all delete queries in parallel
-    const deleteResults = await Promise.all(deleteQueries);
-    const deleteErrors = deleteResults.filter(r => r.error);
+    // 6. Delete compliance reviews
+    console.log('     - Deleting compliance reviews...');
+    deleteQueries.push(
+      supabase.from('compliance_reviews').delete().eq('reviewed_by', userIdToDelete)
+    );
+
+    // 7. Delete compliance batches assigned to this user
+    console.log('     - Deleting compliance batches...');
+    deleteQueries.push(
+      supabase.from('compliance_batches').delete().eq('assigned_to', userIdToDelete)
+    );
+
+    // Execute all delete queries
+    const deleteResults = await Promise.allSettled(deleteQueries);
+    const deleteErrors = deleteResults
+      .filter(r => r.status === 'fulfilled' && r.value.error)
+      .map(r => r.value.error);
 
     if (deleteErrors.length > 0) {
-      console.warn('   ⚠️ Some delete queries failed:', deleteErrors);
-      // Continue anyway - try to delete the user
+      console.warn('   ⚠️ Some delete queries had errors:', deleteErrors.map(e => e.message));
+      // Continue anyway - try to proceed with user deletion
     } else {
       console.log('   ✅ Related records deleted successfully');
     }
 
-    // Step 2: Delete from Supabase Auth
-    console.log('   Step 2: Deleting auth user...');
+    // Step 2: Handle user records created by this user (set created_by to NULL)
+    console.log('   Step 2: Clearing created_by references...');
+    try {
+      await supabase
+        .from('users')
+        .update({ created_by: null })
+        .eq('created_by', userIdToDelete);
+      console.log('   ✅ Created_by references cleared');
+    } catch (err) {
+      console.warn('   ⚠️ Error clearing created_by:', err.message);
+    }
+
+    // Step 3: Delete from Supabase Auth
+    console.log('   Step 3: Deleting auth user...');
     try {
       await supabase.auth.admin.deleteUser(userIdToDelete);
       console.log('   ✅ Auth user deleted');
@@ -805,8 +820,8 @@ router.delete('/:id/force', async (req, res) => {
       // Continue anyway - user record might still be in db to clean up
     }
 
-    // Step 3: Delete from users table
-    console.log('   Step 3: Deleting from users table...');
+    // Step 4: Delete from users table
+    console.log('   Step 4: Deleting from users table...');
     const { error: dbError } = await supabase
       .from('users')
       .delete()
@@ -827,11 +842,16 @@ router.delete('/:id/force', async (req, res) => {
         role: userToDelete.role,
       },
       deletedRecords: {
+        auditLogs: 'All audit logs deleted',
+        callbacks: 'All callbacks deleted',
         outcomes: 'All outcomes deleted',
         transfers: 'All transfers deleted',
         closerRecords: 'All closer records deleted',
-        complianceBatches: 'All compliance batches deleted',
         complianceReviews: 'All compliance reviews deleted',
+        complianceBatches: 'All compliance batches deleted',
+      },
+      clearedReferences: {
+        createdBy: 'Set created_by to NULL on other users',
       }
     });
   } catch (err) {
