@@ -61,19 +61,19 @@ INSERT INTO closer_records (
   disposition_id, remarks, status, created_at, updated_at
 )
 SELECT
-  transfer_id,
-  closer_id,
-  company_id,
-  customer_phone,
-  customer_name,
+  o.transfer_id,
+  o.closer_id,
+  o.company_id,
+  o.customer_phone,
+  o.customer_name,
   'N/A'::text as vin,                    -- outcomes doesn't have VIN, default to N/A
-  COALESCE(reference_no, 'LEGACY-' || ROW_NUMBER() OVER (ORDER BY created_at))::text as reference_no,
+  'LEGACY-' || ROW_NUMBER() OVER (ORDER BY o.created_at)::text as reference_no,  -- generate reference from outcomes
   'Legacy Import'::text as fronter_name,  -- outcomes doesn't have fronter info
   CURRENT_DATE as record_date,            -- use today's date for legacy records
-  disposition_id,
-  remarks,
+  o.disposition_id,
+  o.remarks,
   'SOLD'::text as status,                -- outcomes are completed sales
-  created_at,
+  o.created_at,
   NOW()::timestamptz as updated_at
 FROM outcomes o
 WHERE NOT EXISTS (
