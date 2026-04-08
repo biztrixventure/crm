@@ -735,76 +735,64 @@ router.delete('/:id/force', async (req, res) => {
 
     console.log(`🗑️ Force deleting user: ${userToDelete.email} (${userToDelete.role})`);
 
-    // Step 1: Orphan all related records by setting closer_id/fronter_id to NULL
-    console.log('   Step 1: Orphaning related records...');
+    // Step 1: Delete all related records (cascade delete)
+    console.log('   Step 1: Deleting related records...');
 
-    const orphanQueries = [];
+    const deleteQueries = [];
 
-    // Orphan outcomes (set closer_id to NULL)
-    if (userToDelete.role === 'closer' || true) {
-      orphanQueries.push(
-        supabase
-          .from('outcomes')
-          .update({ closer_id: null })
-          .eq('closer_id', userIdToDelete)
-      );
-    }
-
-    // Orphan transfers from fronter
-    if (userToDelete.role === 'fronter' || true) {
-      orphanQueries.push(
-        supabase
-          .from('transfers')
-          .update({ fronter_id: null })
-          .eq('fronter_id', userIdToDelete)
-      );
-    }
-
-    // Orphan transfers assigned to closer
-    if (userToDelete.role === 'closer' || true) {
-      orphanQueries.push(
-        supabase
-          .from('transfers')
-          .update({ closer_id: null })
-          .eq('closer_id', userIdToDelete)
-      );
-    }
-
-    // Orphan closer_records
-    if (userToDelete.role === 'closer' || true) {
-      orphanQueries.push(
-        supabase
-          .from('closer_records')
-          .update({ closer_id: null })
-          .eq('closer_id', userIdToDelete)
-      );
-    }
-
-    // Orphan compliance batches (set assigned_to to NULL)
-    orphanQueries.push(
-      supabase
-        .from('compliance_batches')
-        .update({ assigned_to: null })
-        .eq('assigned_to', userIdToDelete)
-    );
-
-    // Orphan compliance reviews (set reviewed_by to NULL)
-    orphanQueries.push(
+    // Delete compliance reviews where this user reviewed
+    deleteQueries.push(
       supabase
         .from('compliance_reviews')
-        .update({ reviewed_by: null })
+        .delete()
         .eq('reviewed_by', userIdToDelete)
     );
 
-    // Execute all orphaning queries in parallel
-    const orphanResults = await Promise.all(orphanQueries);
-    const orphanErrors = orphanResults.filter(r => r.error);
+    // Delete compliance batches assigned to this user
+    deleteQueries.push(
+      supabase
+        .from('compliance_batches')
+        .delete()
+        .eq('assigned_to', userIdToDelete)
+    );
 
-    if (orphanErrors.length > 0) {
-      console.warn('   ⚠️ Some orphaning queries failed:', orphanErrors);
+    // Delete outcomes
+    if (userToDelete.role === 'closer' || true) {
+      deleteQueries.push(
+        supabase
+          .from('outcomes')
+          .delete()
+          .eq('closer_id', userIdToDelete)
+      );
+    }
+
+    // Delete transfers
+    deleteQueries.push(
+      supabase
+        .from('transfers')
+        .delete()
+        .or(`fronter_id.eq.${userIdToDelete},closer_id.eq.${userIdToDelete}`)
+    );
+
+    // Delete closer_records
+    if (userToDelete.role === 'closer' || true) {
+      deleteQueries.push(
+        supabase
+          .from('closer_records')
+          .delete()
+          .eq('closer_id', userIdToDelete)
+      );
+    }
+
+    // Execute all delete queries in parallel
+    const deleteResults = await Promise.all(deleteQueries);
+    const deleteErrors = deleteResults.filter(r => r.error);
+
+    if (deleteErrors.length > 0) {
+      console.warn('   ⚠️ Some delete queries failed:', deleteErrors);
       // Continue anyway - try to delete the user
     } else {
-      console.log('   ✅ Records orphaned successfully');
+      console.log('   ✅ Related records deleted successfully');
     }
 
     // Step 2: Delete from Supabase Auth
@@ -838,12 +826,12 @@ router.delete('/:id/force', async (req, res) => {
         email: userToDelete.email,
         role: userToDelete.role,
       },
-      orphanedRecords: {
-        outcomes: 'Set closer_id to NULL',
-        transfers: 'Set fronter_id/closer_id to NULL',
-        closerRecords: 'Set closer_id to NULL',
-        complianceBatches: 'Set assigned_to to NULL',
-        complianceReviews: 'Set reviewed_by to NULL',
+      deletedRecords: {
+        outcomes: 'All outcomes deleted',
+        transfers: 'All transfers deleted',
+        closerRecords: 'All closer records deleted',
+        complianceBatches: 'All compliance batches deleted',
+        complianceReviews: 'All compliance reviews deleted',
       }
     });
   } catch (err) {

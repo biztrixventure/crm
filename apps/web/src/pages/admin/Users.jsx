@@ -177,7 +177,7 @@ export default function UsersPage() {
   }
 
   async function handleForceDelete(user) {
-    const confirmMsg = `FORCE DELETE: ${user.full_name} (${user.email})\n\nThis will:\n- Orphan all their records (set closer_id/fronter_id to NULL)\n- Delete their auth account\n- Remove them from the system\n\nThis action CANNOT be undone. Are you certain?`;
+    const confirmMsg = `FORCE DELETE: ${user.full_name} (${user.email})\n\nThis will DELETE:\n- All their outcomes/records\n- All their transfers\n- All related compliance batches\n- Their auth account\n- Their user account\n\nThis action CANNOT be undone. Are you certain?`;
 
     if (!window.confirm(confirmMsg)) {
       return;
@@ -185,7 +185,7 @@ export default function UsersPage() {
 
     try {
       const response = await api.delete(`/users/${user.id}/force`);
-      toast.success(`User force deleted! Records orphaned:`, {
+      toast.success(`User force deleted! All records removed.`, {
         duration: 5000,
       });
       toast.success(`${user.email} removed from system`, {
