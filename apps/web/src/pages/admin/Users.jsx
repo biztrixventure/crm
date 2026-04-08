@@ -30,6 +30,7 @@ export default function UsersPage() {
   const currentUser = useAuthStore((state) => state.user);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [managers, setManagers] = useState([]); // For closer manager assignment
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -40,6 +41,7 @@ export default function UsersPage() {
     full_name: '',
     role: 'fronter',
     company_id: '',
+    managed_by: '', // For assigning closer to a manager
     is_active: true,
   });
 
@@ -77,8 +79,12 @@ export default function UsersPage() {
     try {
       const companiesRes = await api.get('/companies', { timeout: 15000 });
       setCompanies(companiesRes.data.companies || []);
+
+      // Also fetch closer managers for assignment
+      const managersRes = await api.get('/users?role=closer_manager&limit=50', { timeout: 15000 });
+      setManagers(managersRes.data.users || []);
     } catch (error) {
-      console.error('Failed to fetch companies data:', error);
+      console.error('Failed to fetch companies/managers data:', error);
       toast.error(error.response?.data?.error || 'Failed to fetch companies');
     }
   }
@@ -90,6 +96,7 @@ export default function UsersPage() {
       full_name: '',
       role: currentUser?.role === 'company_admin' ? 'fronter' : 'fronter',
       company_id: currentUser?.role === 'company_admin' ? currentUser?.companyId || '' : '',
+      managed_by: '',
       is_active: true,
     });
     setEditingUser(null);
@@ -105,6 +112,7 @@ export default function UsersPage() {
       full_name: user.full_name || '',
       role: user.role || 'fronter',
       company_id: user.company_id || '',
+      managed_by: user.managed_by || '',
       is_active: user.is_active ?? true,
     });
     setShowModal(true);
@@ -120,6 +128,11 @@ export default function UsersPage() {
       company_id: requiresCompany ? (formData.company_id || null) : null,
       is_active: !!formData.is_active,
     };
+
+    // Add managed_by for closers if assigning to a manager
+    if (formData.role === 'closer' && formData.managed_by) {
+      payload.managed_by = formData.managed_by;
+    }
 
     try {
       if (editingUser) {
@@ -434,6 +447,29 @@ export default function UsersPage() {
                   </select>
                 </div>
               </div>
+
+              {!editingUser && formData.role === 'closer' && isSuperAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
+                    Assign to Manager <span className="text-xs text-primary-500">(Optional)</span>
+                  </label>
+                  <select
+                    value={formData.managed_by || ''}
+                    onChange={(e) => setFormData((v) => ({ ...v, managed_by: e.target.value }))}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-cream-300 dark:border-dark-700 bg-cream-50/50 dark:bg-dark-800/50 text-primary-800 dark:text-primary-100"
+                  >
+                    <option value="">No manager (unassigned)</option>
+                    {managers.map((manager) => (
+                      <option key={manager.id} value={manager.id}>
+                        {manager.full_name} ({manager.email})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-primary-600 dark:text-primary-400 mt-1">
+                    If assigned, this closer will appear in the manager's team
+                  </p>
+                </div>
+              )}
 
               {editingUser && (
                 <label className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">

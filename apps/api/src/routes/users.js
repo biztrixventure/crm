@@ -115,6 +115,12 @@ router.post('/', validate(createUserSchema), async (req, res) => {
     return res.status(422).json({ error: 'This role should not be assigned to a company' });
   }
 
+  // If creating a closer, extract and validate managed_by (for super admin to assign manager)
+  let managedBy = null;
+  if (newUserRole === 'closer' && creatorRole === 'super_admin') {
+    managedBy = req.body.managed_by || null; // Optional manager assignment
+  }
+
   try {
     // Create auth user in Supabase
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -139,6 +145,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
         full_name,
         role: newUserRole,
         company_id: creatorRole === 'company_admin' ? creatorCompanyId : company_id,
+        managed_by: managedBy, // Set manager if assigning a closer to a manager
         created_by: creatorId,
       })
       .select(`
@@ -147,6 +154,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
         full_name,
         role,
         company_id,
+        managed_by,
         is_active,
         created_at,
         companies!users_company_id_fkey (
@@ -408,6 +416,7 @@ router.patch('/:id', validate(updateUserSchema), async (req, res) => {
         full_name,
         role,
         company_id,
+        managed_by,
         is_active,
         totp_enabled,
         created_at,
