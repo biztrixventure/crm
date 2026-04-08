@@ -24,6 +24,7 @@ router.get('/', async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Build query with timeout protection
     let query = supabase
       .from('users')
       .select(`
@@ -32,14 +33,10 @@ router.get('/', async (req, res) => {
         full_name,
         role,
         company_id,
+        managed_by,
         is_active,
         totp_enabled,
-        created_at,
-        companies!users_company_id_fkey (
-          id,
-          name,
-          display_name
-        )
+        created_at
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit);
@@ -54,16 +51,45 @@ router.get('/', async (req, res) => {
       query = query.eq('company_id', companyId);
     }
 
-    const { data: users, error } = await query;
+    // Create a Promise that rejects after 15 seconds
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout - took too long to fetch users')), 15000)
+    );
 
-    if (error) throw error;
+    // Race the query against the timeout
+    const queryPromise = query.then(result => {
+      if (result.error) throw result.error;
+      return result.data;
+    });
+
+    const users = await Promise.race([queryPromise, timeoutPromise]);
 
     // Check if there are more results (limit + 1 to detect hasMore)
     const hasMore = users && users.length > limit;
     const visibleUsers = users ? users.slice(0, limit) : [];
 
-    res.json({ 
-      users: visibleUsers || [],
+    // Separately fetch company names if needed (avoid relationship join for performance)
+    const companyIds = [...new Set(visibleUsers.filter(u => u.company_id).map(u => u.company_id))];
+    let companies = {};
+    if (companyIds.length > 0) {
+      const { data: companiesData } = await supabase
+        .from('companies')
+        .select('id, name, display_name')
+        .in('id', companyIds);
+
+      if (companiesData) {
+        companies = companiesData.reduce((acc, c) => ({...acc, [c.id]: c}), {});
+      }
+    }
+
+    // Enrich users with company data
+    const enrichedUsers = visibleUsers.map(u => ({
+      ...u,
+      company: u.company_id ? companies[u.company_id] : null
+    }));
+
+    res.json({
+      users: enrichedUsers || [],
       pagination: {
         limit,
         offset,
@@ -72,6 +98,15 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('Get users error:', err);
+
+    // Handle timeout specifically
+    if (err.message.includes('timeout')) {
+      return res.status(504).json({
+        error: 'Query timeout',
+        message: 'The users list is taking too long to load. Please try again or apply filters to narrow results.'
+      });
+    }
+
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
