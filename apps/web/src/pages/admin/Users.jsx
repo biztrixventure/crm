@@ -253,6 +253,16 @@ export default function UsersPage() {
         managed_by: res.data.user.managed_by,
         is_active: res.data.user.is_active,
       });
+
+      // Load managers list if needed for resolving managed_by
+      if (managers.length === 0) {
+        try {
+          const managersRes = await api.get('/users?role=closer_manager&limit=50', { timeout: 15000 });
+          setManagers(managersRes.data.users || []);
+        } catch (err) {
+          console.warn('Failed to fetch managers list:', err);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch user details:', error);
       toast.error('Failed to fetch user details');
@@ -536,7 +546,7 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              {!editingUser && formData.role === 'closer' && isSuperAdmin && (
+              {formData.role === 'closer' && isSuperAdmin && (
                 <div>
                   <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
                     Assign to Manager <span className="text-xs text-primary-500">(Optional)</span>
