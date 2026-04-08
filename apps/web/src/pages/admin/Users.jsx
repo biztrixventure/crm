@@ -274,6 +274,8 @@ export default function UsersPage() {
       toast.error(error.response?.data?.error || 'Failed to update user');
     }
   }
+
+  const filteredUsers = users.filter((u) => {
     const q = searchTerm.toLowerCase();
     const companyName = u.companies?.display_name || '';
     return (
