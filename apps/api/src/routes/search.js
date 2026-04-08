@@ -248,20 +248,27 @@ router.get(
         is_sold: false, // Transfers are not yet completed sales
       }));
 
-      const recordResults = (closerRecordsData || []).map((r) => ({
-        type: 'record',
-        id: r.id,
-        customer_phone: r.customer_phone,
-        customer_name: r.customer_name,
-        customer_email: r.customer_email || null,
-        vin: r.vin || null,
-        company: r.companies?.display_name || r.companies?.name || 'N/A',
-        status: r.status,
-        disposition: r.dispositions?.label || null,
-        closer_name: r.closer?.full_name || 'Unknown',
-        created_at: r.created_at,
-        is_sold: r.dispositions?.label?.toLowerCase() === 'sale made', // true if disposition = "Sale Made"
-      }));
+      const recordResults = (closerRecordsData || []).map((r) => {
+        // Flexible disposition check - supports multiple "sold" labels
+        const dispositionLabel = r.dispositions?.label?.toLowerCase().trim() || '';
+        const soldLabels = ['sale made', 'sold', 'sale', 'closed won', 'sold (auto)', 'sold (rv)'];
+        const isSold = soldLabels.includes(dispositionLabel);
+
+        return {
+          type: 'record',
+          id: r.id,
+          customer_phone: r.customer_phone,
+          customer_name: r.customer_name,
+          customer_email: r.customer_email || null,
+          vin: r.vin || null,
+          company: r.companies?.display_name || r.companies?.name || 'N/A',
+          status: r.status,
+          disposition: r.dispositions?.label || null,
+          closer_name: r.closer?.full_name || 'Unknown',
+          created_at: r.created_at,
+          is_sold: isSold,
+        };
+      });
 
       const results = [...transferResults, ...recordResults];
 

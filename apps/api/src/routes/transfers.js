@@ -36,10 +36,38 @@ router.get('/', validateQuery(transferQuerySchema), async (req, res) => {
       query = query.eq('closer_id', userId);
     } else if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
-    } else if (['super_admin', 'readonly_admin', 'closer_manager', 'operations_manager'].includes(role) && company_id) {
+    } else if (role === 'closer_manager') {
+      // Closer managers see only their managed closers' transfers
+      try {
+        const { data: managedClosers, error: closersError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('managed_by', userId)
+          .eq('role', 'closer');
+
+        if (closersError) throw closersError;
+
+        const closerIds = (managedClosers || []).map(c => c.id);
+        if (closerIds.length === 0) {
+          return res.json({
+            transfers: [],
+            pagination: { page, limit, hasMore: false },
+          });
+        }
+
+        query = query.in('closer_id', closerIds);
+      } catch (err) {
+        console.error('Error fetching managed closers for transfers:', err);
+        throw err;
+      }
+    } else if (role === 'operations_manager') {
+      // Operations manager can see all transfers (apply company_id filter if provided)
+      if (company_id) {
+        query = query.eq('company_id', company_id);
+      }
+    } else if (['super_admin', 'readonly_admin'].includes(role) && company_id) {
       query = query.eq('company_id', company_id);
     }
-    // closer_manager and operations_manager can see all transfers without company_id filter
 
     // Additional filters
     if (fronter_id) query = query.eq('fronter_id', fronter_id);

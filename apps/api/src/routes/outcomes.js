@@ -35,12 +35,39 @@ router.get('/', validateQuery(outcomeQuerySchema), async (req, res) => {
       .order('created_at', { ascending: false });
 
     // Role-based filtering
-    if (role === 'closer' || role === 'closer_manager') {
+    if (role === 'closer') {
       query = query.eq('closer_id', userId);
+    } else if (role === 'closer_manager') {
+      // Get all closers managed by this manager
+      try {
+        const { data: managedClosers, error: closersError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('managed_by', userId)
+          .eq('role', 'closer');
+
+        if (closersError) throw closersError;
+
+        const closerIds = (managedClosers || []).map(c => c.id);
+        if (closerIds.length === 0) {
+          return res.json({
+            outcomes: [],
+            pagination: { page, limit, hasMore: false },
+          });
+        }
+
+        query = query.in('closer_id', closerIds);
+      } catch (err) {
+        console.error('Error fetching managed closers for outcomes:', err);
+        throw err;
+      }
     } else if (role === 'company_admin') {
       query = query.eq('company_id', companyId);
-    } else if (['super_admin', 'readonly_admin'].includes(role) && company_id) {
+    } else if (['super_admin', 'readonly_admin', 'operations_manager'].includes(role) && company_id) {
       query = query.eq('company_id', company_id);
+    } else if (role === 'operations_manager') {
+      // Operations manager can see all outcomes (no filter if no company_id specified)
+      // Filter applied below if company_id provided
     }
 
     // Additional filters

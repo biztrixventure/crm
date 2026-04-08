@@ -262,6 +262,7 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
 router.patch('/closers/:id', async (req, res) => {
   const { id: closerId } = req.params;
   const { is_active } = req.body;
+  const { id: managerId } = req.user;
 
   try {
     // Only allowing is_active toggle for now
@@ -269,11 +270,27 @@ router.patch('/closers/:id', async (req, res) => {
       return res.status(400).json({ error: 'is_active must be a boolean' });
     }
 
+    // CRITICAL FIX: Verify that closerId is actually managed by this manager
+    const { data: closer, error: verifyError } = await supabase
+      .from('users')
+      .select('id, managed_by, role')
+      .eq('id', closerId)
+      .eq('role', 'closer')
+      .single();
+
+    if (verifyError || !closer) {
+      return res.status(404).json({ error: 'Closer not found' });
+    }
+
+    // Authorization check: Manager can only update their own managed closers
+    if (closer.managed_by !== managerId) {
+      return res.status(403).json({ error: 'Cannot manage closers outside your team' });
+    }
+
     const { data: updated, error } = await supabase
       .from('users')
       .update({ is_active })
       .eq('id', closerId)
-      .eq('role', 'closer')
       .select();
 
     if (error) throw error;
@@ -339,19 +356,25 @@ router.get('/performance', async (req, res) => {
 // GET /closer-manager/performance/:id - Single closer performance
 router.get('/performance/:id', async (req, res) => {
   const { id: closerId } = req.params;
+  const { id: managerId } = req.user;
   const period = req.query.period || 'today';
 
   try {
-    // Verify closer exists
+    // CRITICAL FIX: Verify closer is managed by this manager
     const { data: closer, error: closerError } = await supabase
       .from('users')
-      .select('id, email, full_name')
+      .select('id, email, full_name, managed_by, role')
       .eq('id', closerId)
       .eq('role', 'closer')
       .single();
 
     if (closerError || !closer) {
       return res.status(404).json({ error: 'Closer not found' });
+    }
+
+    // Authorization check: Manager can only view managed closers' performance
+    if (closer.managed_by !== managerId) {
+      return res.status(403).json({ error: 'Cannot view performance for closers outside your team' });
     }
 
     const stats = await getCloserPerformanceStats(closerId, period);
@@ -513,21 +536,27 @@ router.get('/transfers', async (req, res) => {
 router.patch('/transfers/:id/reassign', async (req, res) => {
   const { id: transferId } = req.params;
   const { new_closer_id } = req.body;
+  const { id: managerId } = req.user;
 
   if (!new_closer_id) {
     return res.status(400).json({ error: 'new_closer_id is required' });
   }
 
   try {
-    // Check if transfer exists
+    // Check if transfer exists AND it belongs to a managed closer
     const { data: transfer, error: transferError } = await supabase
       .from('transfers')
-      .select('id')
+      .select('id, closer_id, closer!transfers_closer_id_fkey(managed_by)')
       .eq('id', transferId)
       .single();
 
     if (transferError || !transfer) {
       return res.status(404).json({ error: 'Transfer not found' });
+    }
+
+    // CRITICAL FIX: Verify current closer is managed by this manager
+    if (!transfer.closer || transfer.closer.managed_by !== managerId) {
+      return res.status(403).json({ error: 'Cannot reassign transfers outside your team' });
     }
 
     // Check if closer_record already exists for this transfer
@@ -539,16 +568,21 @@ router.patch('/transfers/:id/reassign', async (req, res) => {
       });
     }
 
-    // Verify new_closer_id is valid closer
+    // Verify new_closer_id is valid closer AND managed by this manager
     const { data: newCloser, error: newCloserError } = await supabase
       .from('users')
-      .select('id')
+      .select('id, managed_by, role')
       .eq('id', new_closer_id)
       .eq('role', 'closer')
       .single();
 
     if (newCloserError || !newCloser) {
       return res.status(400).json({ error: 'Invalid closer_id' });
+    }
+
+    // CRITICAL FIX: Verify new closer is managed by this manager
+    if (newCloser.managed_by !== managerId) {
+      return res.status(403).json({ error: 'Cannot assign transfer to closer outside your team' });
     }
 
     // Reassign transfer

@@ -367,21 +367,28 @@ router.get('/batches/:id', async (req, res) => {
 router.patch('/batches/:id/assign', ensureComplianceManager, async (req, res) => {
   const { id: batchId } = req.params;
   const { assign_to } = req.body;
+  const { id: managerId } = req.user;
 
   if (!assign_to) {
     return res.status(400).json({ error: 'assign_to (user_id) is required' });
   }
 
   try {
-    // Get batch and check status
+    // Get batch and check status AND company
     const { data: batch, error: batchError } = await supabase
       .from('compliance_batches')
-      .select('id, status')
+      .select('id, status, company_id')
       .eq('id', batchId)
       .single();
 
     if (batchError || !batch) {
       return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    // CRITICAL FIX: Verify manager can access this batch's company
+    const canAccess = await canAccessCompany(managerId, batch.company_id);
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Cannot access this batch' });
     }
 
     // Only allow reassignment for pending batches (no work started)
