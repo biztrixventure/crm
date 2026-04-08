@@ -17,6 +17,7 @@ export const updateUserSchema = z.object({
   full_name: z.string().min(2).max(100).optional(),
   role: z.enum(roles).optional(),
   company_id: z.string().uuid().optional().nullable(),
+  managed_by: z.string().uuid().optional().nullable(),
   is_active: z.boolean().optional(),
 });
 

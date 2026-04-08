@@ -365,8 +365,10 @@ router.get('/:id', async (req, res) => {
         full_name,
         role,
         company_id,
+        managed_by,
         is_active,
         totp_enabled,
+        created_by,
         created_at,
         companies!users_company_id_fkey (
           id,
@@ -454,6 +456,7 @@ router.patch('/:id', validate(updateUserSchema), async (req, res) => {
         managed_by,
         is_active,
         totp_enabled,
+        created_by,
         created_at,
         companies!users_company_id_fkey (
           id,

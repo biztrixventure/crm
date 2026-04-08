@@ -7,6 +7,7 @@ import {
   UsersIcon,
   XIcon,
   CheckIcon,
+  EyeIcon,
 } from 'lucide-animated';
 import { Trash2 as TrashIcon } from 'lucide-react';
 import api from '../../lib/axios';
@@ -34,6 +35,12 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userDetails, setUserDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [detailsFormData, setDetailsFormData] = useState({});
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
@@ -229,7 +236,44 @@ export default function UsersPage() {
     return false;
   }
 
-  const filteredUsers = users.filter((u) => {
+  // View user details
+  async function handleViewDetails(user) {
+    setSelectedUser(user);
+    setShowDetailModal(true);
+    setDetailsLoading(true);
+    setIsEditingDetails(false);
+
+    try {
+      const res = await api.get(`/users/${user.id}`);
+      setUserDetails(res.data.user);
+      setDetailsFormData({
+        full_name: res.data.user.full_name,
+        email: res.data.user.email,
+        company_id: res.data.user.company_id,
+        managed_by: res.data.user.managed_by,
+        is_active: res.data.user.is_active,
+      });
+    } catch (error) {
+      console.error('Failed to fetch user details:', error);
+      toast.error('Failed to fetch user details');
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
+  // Save user detail changes
+  async function handleSaveDetails() {
+    try {
+      const res = await api.patch(`/users/${userDetails.id}`, detailsFormData);
+      setUserDetails(res.data.user);
+      setIsEditingDetails(false);
+      await fetchUsers();
+      toast.success('User updated successfully');
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      toast.error(error.response?.data?.error || 'Failed to update user');
+    }
+  }
     const q = searchTerm.toLowerCase();
     const companyName = u.companies?.display_name || '';
     return (
@@ -341,6 +385,14 @@ export default function UsersPage() {
                   {canManage && (
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewDetails(u)}
+                          className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform"
+                          title="View detailed information"
+                        >
+                          <EyeIcon size={14} />
+                          View
+                        </button>
                         <button
                           onClick={() => handleEdit(u)}
                           className="px-3 py-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs flex items-center gap-1 hover:scale-105 transition-transform"
@@ -533,6 +585,194 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Detail Modal */}
+      {showDetailModal && userDetails && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-dark-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-blue-400 dark:from-blue-600 dark:to-blue-700 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">User Details</h2>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setUserDetails(null);
+                  setIsEditingDetails(false);
+                }}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <XIcon size={20} className="text-white" />
+              </button>
+            </div>
+
+            {detailsLoading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary-300 border-t-primary-600 rounded-full mx-auto" />
+              </div>
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveDetails(); }} className="p-6 space-y-4">
+                {/* Basic Info */}
+                <div className="bg-cream-50 dark:bg-dark-800 rounded-xl p-4">
+                  <h3 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">Basic Information</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Full Name</label>
+                      {isEditingDetails ? (
+                        <input
+                          type="text"
+                          value={detailsFormData.full_name}
+                          onChange={(e) => setDetailsFormData({ ...detailsFormData, full_name: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border-2 border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-800 dark:text-primary-100"
+                        />
+                      ) : (
+                        <p className="text-primary-800 dark:text-primary-100">{userDetails.full_name}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Email</label>
+                      <p className="text-primary-800 dark:text-primary-100 text-sm">{userDetails.email}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Role</label>
+                      <p className="text-primary-800 dark:text-primary-100 text-sm font-mono bg-primary-100 dark:bg-primary-900/30 px-2 py-1 rounded w-fit">{userDetails.role}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Status</label>
+                      <p className={cn("text-sm font-semibold px-2 py-1 rounded w-fit", userDetails.is_active ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300")}>
+                        {userDetails.is_active ? 'Active' : 'Inactive'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Logic */}
+                {isSuperAdmin && (
+                  <div className="bg-cream-50 dark:bg-dark-800 rounded-xl p-4">
+                    <h3 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">Business Logic {isEditingDetails ? '(Editable)' : ''}</h3>
+                    <div className="space-y-3">
+                      {userDetails.companies && (
+                        <div>
+                          <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Company</label>
+                          <p className="text-primary-800 dark:text-primary-100 text-sm">{userDetails.companies?.display_name || 'None (BizTrix Internal)'}</p>
+                        </div>
+                      )}
+                      {['closer', 'fronter', 'company_admin'].includes(userDetails.role) && (
+                        <div>
+                          <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Company Assignment</label>
+                          {isEditingDetails ? (
+                            <select
+                              value={detailsFormData.company_id || ''}
+                              onChange={(e) => setDetailsFormData({ ...detailsFormData, company_id: e.target.value || null })}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-800 dark:text-primary-100"
+                            >
+                              <option value="">None</option>
+                              {companies.map(c => (
+                                <option key={c.id} value={c.id}>{c.display_name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-sm text-primary-600 dark:text-primary-400">{detailsFormData.company_id ? companies.find(c => c.id === detailsFormData.company_id)?.display_name : 'Not assigned'}</p>
+                          )}
+                        </div>
+                      )}
+                      {userDetails.role === 'closer' && (
+                        <div>
+                          <label className="block text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">Assigned Manager</label>
+                          {isEditingDetails ? (
+                            <select
+                              value={detailsFormData.managed_by || ''}
+                              onChange={(e) => setDetailsFormData({ ...detailsFormData, managed_by: e.target.value || null })}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-cream-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-primary-800 dark:text-primary-100"
+                            >
+                              <option value="">No manager (unassigned)</option>
+                              {managers.map(m => (
+                                <option key={m.id} value={m.id}>{m.full_name} ({m.email})</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-sm text-primary-600 dark:text-primary-400">
+                              {managers.find(m => m.id === detailsFormData.managed_by)?.full_name || 'Not assigned'}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Audit Info */}
+                <div className="bg-cream-50 dark:bg-dark-800 rounded-xl p-4">
+                  <h3 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">Audit Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-primary-600 dark:text-primary-400">Created:</span>
+                      <span className="text-primary-800 dark:text-primary-100 font-mono">{formatDateTime(userDetails.created_at)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-primary-600 dark:text-primary-400">Created By:</span>
+                      <span className="text-primary-800 dark:text-primary-100 font-mono">{userDetails.created_by || 'System'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-4">
+                  {isSuperAdmin && !isEditingDetails && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingDetails(true);
+                        fetchCompaniesIfNeeded();
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-primary-500 dark:bg-primary-600 hover:bg-primary-600 dark:hover:bg-primary-500 text-white font-medium transition-colors"
+                    >
+                      Edit Details
+                    </button>
+                  )}
+                  {isEditingDetails && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingDetails(false);
+                          setDetailsFormData({
+                            full_name: userDetails.full_name,
+                            email: userDetails.email,
+                            company_id: userDetails.company_id,
+                            managed_by: userDetails.managed_by,
+                            is_active: userDetails.is_active,
+                          });
+                        }}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-cream-200 dark:bg-dark-700 text-primary-700 dark:text-primary-300 font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-500 text-white font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckIcon size={16} />
+                        Save Changes
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      setUserDetails(null);
+                      setIsEditingDetails(false);
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-cream-200 dark:bg-dark-700 text-primary-700 dark:text-primary-300 font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
