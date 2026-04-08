@@ -123,6 +123,14 @@ export default function Companies() {
       const response = await api.get(`/companies/${companyId}/export?type=${type}&days=30`, {
         responseType: 'blob'
       });
+
+      // Check if response is actually an error JSON
+      if (response.headers['content-type']?.includes('application/json')) {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        throw new Error(error.error || 'Export failed');
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -130,9 +138,12 @@ export default function Companies() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} export downloaded successfully`);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed');
+      toast.error(error.message || 'Export failed. Please try again.');
     }
   }
 
@@ -204,7 +215,7 @@ export default function Companies() {
         {filteredCompanies.map((company) => (
           <div
             key={company.id}
-            className="bg-white dark:bg-dark-900/80 rounded-2xl p-6 shadow-lg shadow-primary-200/50 dark:shadow-dark-950/50 border border-cream-200/50 dark:border-dark-800/50 hover:shadow-xl hover:shadow-primary-300/30 dark:hover:shadow-dark-950/70 transition-all hover:scale-105"
+            className="bg-white dark:bg-dark-900/80 rounded-2xl p-6 shadow-lg shadow-primary-200/50 dark:shadow-dark-950/50 border border-cream-200/50 dark:border-dark-800/50 hover:shadow-xl hover:shadow-primary-300/30 dark:hover:shadow-dark-950/70 transition-all hover:-translate-y-1"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -247,21 +258,21 @@ export default function Companies() {
             <div className="flex gap-2">
               <button
                 onClick={() => handleViewDetails(company)}
-                className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
+                className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
               >
                 <EyeIcon size={16} />
                 View
               </button>
               <button
                 onClick={() => handleEdit(company)}
-                className="flex-1 px-3 py-2 bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
+                className="flex-1 px-3 py-2 bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
               >
                 <EditIcon size={16} />
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(company.id)}
-                className="px-3 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 hover:scale-105"
+                className="flex-1 px-3 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
               >
                 <TrashIcon size={16} />
                 Delete

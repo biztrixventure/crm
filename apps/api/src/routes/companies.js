@@ -465,8 +465,8 @@ router.get('/:id/export', roleGuard('super_admin', 'company_admin'), async (req,
         .from('transfers')
         .select(`
           id,
-          caller_phone,
-          caller_name,
+          customer_phone,
+          customer_name,
           state,
           notes,
           created_at,
@@ -480,11 +480,11 @@ router.get('/:id/export', roleGuard('super_admin', 'company_admin'), async (req,
 
       if (error) throw error;
 
-      headers = ['ID', 'Caller Phone', 'Caller Name', 'State', 'Notes', 'Fronter', 'Closer', 'Created At'];
+      headers = ['ID', 'Customer Phone', 'Customer Name', 'State', 'Notes', 'Fronter', 'Closer', 'Created At'];
       data = transfers.map(t => [
         t.id,
-        t.caller_phone,
-        t.caller_name,
+        t.customer_phone,
+        t.customer_name,
         t.state || '',
         t.notes || '',
         t.fronter?.full_name || '',
@@ -524,13 +524,13 @@ router.get('/:id/export', roleGuard('super_admin', 'company_admin'), async (req,
     } else if (type === 'users') {
       const { data: users, error } = await supabase
         .from('users')
-        .select('id, email, full_name, role, is_active, totp_enabled, created_at, last_login')
+        .select('id, email, full_name, role, is_active, totp_enabled, created_at')
         .eq('company_id', id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      headers = ['ID', 'Email', 'Full Name', 'Role', 'Active', '2FA Enabled', 'Created At', 'Last Login'];
+      headers = ['ID', 'Email', 'Full Name', 'Role', 'Active', '2FA Enabled', 'Created At'];
       data = users.map(u => [
         u.id,
         u.email,
@@ -538,8 +538,7 @@ router.get('/:id/export', roleGuard('super_admin', 'company_admin'), async (req,
         u.role,
         u.is_active ? 'Yes' : 'No',
         u.totp_enabled ? 'Yes' : 'No',
-        new Date(u.created_at).toISOString(),
-        u.last_login ? new Date(u.last_login).toISOString() : 'Never'
+        new Date(u.created_at).toISOString()
       ]);
     }
 
