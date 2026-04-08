@@ -205,67 +205,91 @@ router.delete('/:id', roleGuard('super_admin'), async (req, res) => {
     console.log('   Step 1: Deleting related records...');
 
     // Delete transfers for this company
-    await supabase
+    console.log('     - Deleting transfers...');
+    const { error: transfersError } = await supabase
       .from('transfers')
       .delete()
       .eq('company_id', id);
+    if (transfersError) throw new Error(`Transfers delete failed: ${transfersError.message}`);
 
     // Delete outcomes for this company
-    await supabase
+    console.log('     - Deleting outcomes...');
+    const { error: outcomesError } = await supabase
       .from('outcomes')
       .delete()
       .eq('company_id', id);
+    if (outcomesError) throw new Error(`Outcomes delete failed: ${outcomesError.message}`);
 
     // Delete closer_records for this company
-    await supabase
+    console.log('     - Deleting closer_records...');
+    const { error: recordsError } = await supabase
       .from('closer_records')
       .delete()
       .eq('company_id', id);
+    if (recordsError) throw new Error(`Closer records delete failed: ${recordsError.message}`);
 
     // Delete callbacks for this company
-    await supabase
+    console.log('     - Deleting callbacks...');
+    const { error: callbacksError } = await supabase
       .from('callbacks')
       .delete()
       .eq('company_id', id);
+    if (callbacksError) throw new Error(`Callbacks delete failed: ${callbacksError.message}`);
 
-    // Delete users for this company (except their records which we already deleted)
-    const { data: companyUsers } = await supabase
+    // Get users for this company
+    console.log('     - Getting company users...');
+    const { data: companyUsers, error: usersSelectError } = await supabase
       .from('users')
       .select('id')
       .eq('company_id', id);
+    if (usersSelectError) throw new Error(`Users select failed: ${usersSelectError.message}`);
 
     if (companyUsers && companyUsers.length > 0) {
       const userIds = companyUsers.map(u => u.id);
+      console.log(`     - Found ${userIds.length} users, deleting audit logs...`);
 
       // Delete audit logs for these users
-      await supabase
+      const { error: auditError } = await supabase
         .from('audit_logs')
         .delete()
         .in('user_id', userIds);
+      if (auditError) throw new Error(`Audit logs delete failed: ${auditError.message}`);
+
+      // Clear created_by references first (self-reference in users table)
+      console.log('     - Clearing created_by references...');
+      const { error: clearError } = await supabase
+        .from('users')
+        .update({ created_by: null })
+        .in('id', userIds);
+      if (clearError) throw new Error(`Clear created_by failed: ${clearError.message}`);
 
       // Delete users
-      await supabase
+      console.log('     - Deleting users...');
+      const { error: deleteUsersError } = await supabase
         .from('users')
         .delete()
         .in('id', userIds);
+      if (deleteUsersError) throw new Error(`Users delete failed: ${deleteUsersError.message}`);
     }
 
     console.log('   ✅ Related records deleted');
 
     // Step 2: Delete the company itself
     console.log('   Step 2: Deleting company...');
-    const { error } = await supabase
+    const { error: companyError } = await supabase
       .from('companies')
       .delete()
       .eq('id', id);
-
-    if (error) throw error;
+    if (companyError) throw new Error(`Company delete failed: ${companyError.message}`);
 
     console.log(`✅ Company deleted: ${id}\n`);
     res.json({ message: 'Company deleted successfully' });
   } catch (err) {
-    console.error('Delete company error:', err);
-    res.status(500).json({ error: 'Failed to delete company' });
+    console.error('❌ Delete company error:', err.message);
+    res.status(500).json({
+      error: 'Failed to delete company',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
   }
 });
 
