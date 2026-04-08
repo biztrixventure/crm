@@ -236,6 +236,14 @@ router.delete('/:id', roleGuard('super_admin'), async (req, res) => {
       .eq('company_id', id);
     if (callbacksError) throw new Error(`Callbacks delete failed: ${callbacksError.message}`);
 
+    // Delete compliance_batches for this company
+    console.log('     - Deleting compliance_batches...');
+    const { error: batchesError } = await supabase
+      .from('compliance_batches')
+      .delete()
+      .eq('company_id', id);
+    if (batchesError) throw new Error(`Compliance batches delete failed: ${batchesError.message}`);
+
     // Get users for this company
     console.log('     - Getting company users...');
     const { data: companyUsers, error: usersSelectError } = await supabase
