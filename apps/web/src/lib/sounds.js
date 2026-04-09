@@ -4,11 +4,11 @@
  */
 
 export const NOTIFICATION_SOUNDS = {
-  transfer: 'transfer.wav',      // Positive/happy tone for new transfer
-  callback: 'callback.wav',      // Reminder/bell tone for callback
-  sale: 'sale.wav',              // Celebratory tone for sale
-  batch: 'batch.wav',            // Neutral notification tone for batch
-  alert: 'alert.wav',            // Urgent tone for alerts
+  transfer: 'transfer.mp3',      // Positive/happy tone for new transfer
+  callback: 'callback.mp3',      // Reminder/bell tone for callback
+  sale: 'sale.mp3',              // Celebratory tone for sale
+  batch: 'batch.mp3',            // Neutral notification tone for batch
+  alert: 'alert.mp3',            // Urgent tone for alerts
 };
 
 /**

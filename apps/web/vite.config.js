@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'sounds/**/*.wav'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'sounds/**/*.mp3'],
       manifest: {
         name: 'BizTrixVenture CRM',
         short_name: 'BizTrix CRM',
@@ -35,7 +35,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,wav}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
       },
     }),
   ],
