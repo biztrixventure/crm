@@ -243,16 +243,34 @@ export async function notifyTransferCreatedPersistent(closerId, transfer, compan
     'transfer:new',
     title,
     message,
-    { transferId: transfer.id, customerId: transfer.customer_name, companyName },
+    { 
+      transferId: transfer.id, 
+      customerName: transfer.customer_name, 
+      customerPhone: transfer.customer_phone,
+      companyName,
+      fronterId: transfer.fronter_id,
+      fronterName: transfer.fronter?.full_name
+    },
     companyId,
     closer_role
   );
 
-  // Still emit for legacy socket listeners
+  // Emit for real-time delivery to closer
   emitToUser(closerId, 'transfer:new', {
+    id: transfer.id,
+    type: 'transfer:new',
+    title: title,
     message,
-    transfer,
+    is_read: false,
+    created_at: new Date().toISOString(),
     timestamp: new Date().toISOString(),
+    metadata: {
+      transferId: transfer.id,
+      customerName: transfer.customer_name,
+      customerPhone: transfer.customer_phone,
+      companyName,
+      fronterId: transfer.fronter_id
+    }
   });
 }
 

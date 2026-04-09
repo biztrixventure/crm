@@ -5,7 +5,8 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard, featureGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createTransferSchema, updateTransferSchema, transferQuerySchema } from '../schemas/transfer.schema.js';
-import { notifyTransferCreatedPersistent } from '../services/notification.js';
+import { notifyTransferCreatedPersistent, createNotification } from '../services/notification.js';
+import { emitToUser } from '../services/socket.js';
 
 const router = Router();
 
@@ -110,7 +111,7 @@ router.post('/', roleGuard('fronter'), validate(createTransferSchema), async (re
     // Verify closer exists and is active
     const { data: closer, error: closerError } = await supabase
       .from('users')
-      .select('id, full_name, role, is_active')
+      .select('id, full_name, role, is_active, manager_id')
       .eq('id', transferData.closer_id)
       .single();
 
@@ -157,6 +158,82 @@ router.post('/', roleGuard('fronter'), validate(createTransferSchema), async (re
       companyId,
       'closer'
     );
+
+    // Notify the closer's manager (if they have one)
+    if (closer.manager_id) {
+      try {
+        await createNotification(
+          closer.manager_id,
+          'transfer:assigned',
+          'Transfer Assigned',
+          `Transfer assigned to ${closer.full_name} from ${company?.display_name || 'Unknown'}`,
+          {
+            transferId: transfer.id,
+            closerId: closer.id,
+            closerName: closer.full_name,
+            customerName: transfer.customer_name,
+            customerPhone: transfer.customer_phone,
+            companyName: company?.display_name || 'Unknown'
+          },
+          companyId,
+          'closer_manager'
+        );
+
+        // Emit socket event to manager
+        emitToUser(closer.manager_id, 'transfer:assigned', {
+          id: transfer.id,
+          type: 'transfer:assigned',
+          title: 'Transfer Assigned',
+          message: `Transfer assigned to ${closer.full_name}`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          metadata: {
+            transferId: transfer.id,
+            closerId: closer.id,
+            closerName: closer.full_name
+          }
+        });
+      } catch (err) {
+        console.error('Failed to notify manager:', err);
+      }
+    }
+
+    // Notify the fronter (confirmation)
+    try {
+      await createNotification(
+        fronterId,
+        'transfer:created',
+        'Transfer Submitted',
+        `Transfer to ${closer.full_name} for ${transfer.customer_name} has been successfully submitted`,
+        {
+          transferId: transfer.id,
+          closerId: closer.id,
+          closerName: closer.full_name,
+          customerName: transfer.customer_name,
+          customerPhone: transfer.customer_phone,
+          companyName: company?.display_name || 'Unknown'
+        },
+        companyId,
+        'fronter'
+      );
+
+      // Emit socket event to fronter
+      emitToUser(fronterId, 'transfer:created', {
+        id: transfer.id,
+        type: 'transfer:created',
+        title: 'Transfer Submitted',
+        message: `Transfer to ${closer.full_name} has been submitted`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        metadata: {
+          transferId: transfer.id,
+          closerId: closer.id,
+          closerName: closer.full_name
+        }
+      });
+    } catch (err) {
+      console.error('Failed to notify fronter:', err);
+    }
 
     res.status(201).json({ transfer });
   } catch (err) {

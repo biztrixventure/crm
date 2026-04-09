@@ -171,6 +171,40 @@ export function useSocket() {
       }
     });
 
+    // Handle transfer-assigned notifications (for managers)
+    socket.off('transfer:assigned');
+    socket.on('transfer:assigned', (notification) => {
+      try {
+        addNotificationRealtime(notification);
+        toast.success(notification.message || 'Transfer assigned to your team', { duration: 5000 });
+        playSound('transfer');
+        showNotification({
+          title: notification.title || 'Transfer Assigned',
+          message: notification.message || 'A transfer has been assigned to your team',
+          tag: notification.id,
+        });
+      } catch (err) {
+        console.error('Error handling transfer:assigned event:', err);
+      }
+    });
+
+    // Handle transfer-created notifications (for fronters)
+    socket.off('transfer:created');
+    socket.on('transfer:created', (notification) => {
+      try {
+        addNotificationRealtime(notification);
+        toast.success(notification.message || 'Transfer submitted successfully', { duration: 5000 });
+        playSound('transfer');
+        showNotification({
+          title: notification.title || 'Transfer Submitted',
+          message: notification.message || 'Your transfer has been submitted successfully',
+          tag: notification.id,
+        });
+      } catch (err) {
+        console.error('Error handling transfer:created event:', err);
+      }
+    });
+
     socket.off('notification:deleted');
     socket.on('notification:deleted', (data) => {
       try {
@@ -209,6 +243,8 @@ export function useSocket() {
       socket.off('admin:new_entity');
       socket.off('notification:new');
       socket.off('notification:read');
+      socket.off('transfer:assigned');
+      socket.off('transfer:created');
       socket.off('notification:deleted');
       socket.off('notifications:read-all');
     };
