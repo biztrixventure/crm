@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { getSoundPath, NOTIFICATION_SOUNDS } from '../lib/sounds';
+import { NOTIFICATION_SOUNDS } from '../lib/sounds';
 
 /**
  * Hook to manage notification sounds
@@ -42,7 +42,7 @@ export function useNotificationSounds() {
   const loadSounds = useCallback(async () => {
     try {
       for (const [key, filename] of Object.entries(NOTIFICATION_SOUNDS)) {
-        const audio = new Audio(getSoundPath(key));
+        const audio = new Audio(`/sounds/${filename}`);
         audio.preload = 'auto';
         soundsRef.current[key] = audio;
       }
