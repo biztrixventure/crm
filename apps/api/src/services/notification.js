@@ -158,6 +158,8 @@ export async function createNotification(userId, type, title, message, metadata 
       type: notification.type,
       title: notification.title,
       message: notification.message,
+      is_read: notification.is_read,
+      created_at: notification.created_at,
       timestamp: notification.created_at,
       metadata: notification.metadata,
     });

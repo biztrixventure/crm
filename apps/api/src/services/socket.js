@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { getRedis, isRedisConnected } from './redis.js';
+import { notifyCallbackDuePersistent } from './notification.js';
 
 let io = null;
 
@@ -54,9 +55,13 @@ export function initSocket(httpServer) {
     });
 
     // Worker emits this event when callback time is due
-    socket.on('callback:fire', ({ userId, callback }) => {
+    socket.on('callback:fire', async ({ userId, callback }) => {
       if (!userId || !callback) return;
-      notifyCallbackDue(userId, callback);
+      try {
+        await notifyCallbackDuePersistent(userId, callback);
+      } catch (err) {
+        console.error('Error handling callback:fire event:', err);
+      }
     });
   });
 

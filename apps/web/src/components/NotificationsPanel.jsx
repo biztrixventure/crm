@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 export default function NotificationsPanel({ onClose }) {
   const {
     notifications,
+    totalCount,
     unreadCount,
     loading,
     currentPage,
@@ -25,9 +26,17 @@ export default function NotificationsPanel({ onClose }) {
     setCurrentPage(0);
   }, [filter, pageSize, loadNotifications, setCurrentPage]);
 
+  // Load new page data when currentPage changes
+  useEffect(() => {
+    const offset = currentPage * pageSize;
+    loadNotifications(pageSize, offset, filter).catch(err => {
+      console.error('Failed to load page:', err);
+    });
+  }, [currentPage, filter, pageSize, loadNotifications]);
+
   const startIndex = currentPage * pageSize;
   const displayedNotifications = notifications.slice(startIndex, startIndex + pageSize);
-  const totalPages = Math.ceil(notifications.length / pageSize);
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   const handleDeleteNotification = async (id) => {
     try {
@@ -131,11 +140,11 @@ export default function NotificationsPanel({ onClose }) {
           <div className="bg-gray-50 dark:bg-dark-900 border-t border-gray-200 dark:border-dark-700 px-6 py-3 flex items-center justify-between">
             {/* Page info */}
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              {notifications.length > 0 ? (
+              {totalCount > 0 ? (
                 <>
                   Showing {startIndex + 1}–
-                  {Math.min(startIndex + pageSize, notifications.length)} of{' '}
-                  {notifications.length}
+                  {Math.min(startIndex + pageSize, totalCount)} of{' '}
+                  {totalCount}
                 </>
               ) : (
                 'No notifications'

@@ -44,8 +44,19 @@ export function useNotificationSounds() {
       for (const [key, filename] of Object.entries(NOTIFICATION_SOUNDS)) {
         const audio = new Audio(`/sounds/${filename}`);
         audio.preload = 'auto';
+        
+        // Add error handling to Audio element
+        audio.addEventListener('error', (e) => {
+          console.warn(`Failed to load sound file: /sounds/${filename}`, e);
+        });
+        
+        audio.addEventListener('canplaythrough', () => {
+          console.debug(`Sound loaded: ${key}`);
+        });
+
         soundsRef.current[key] = audio;
       }
+      console.log('✓ All notification sounds loaded');
     } catch (err) {
       console.error('Failed to load sounds:', err);
     }
@@ -68,16 +79,24 @@ export function useNotificationSounds() {
 
     try {
       const audio = soundsRef.current[soundType];
-      if (audio) {
-        audio.volume = preferencesRef.current.volume;
-        audio.currentTime = 0; // Reset to start
-        audio.play().catch((err) => {
-          console.warn('Failed to play sound:', err);
+      if (!audio) {
+        console.warn(`Sound not found: ${soundType}`);
+        return;
+      }
+
+      audio.volume = preferencesRef.current.volume;
+      audio.currentTime = 0; // Reset to start
+
+      // Attempt to play with error handling
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Failed to play sound:', err?.message || err);
           // Fail silently - some browsers block autoplay
         });
       }
     } catch (err) {
-      console.error('Failed to play sound:', err);
+      console.warn('Error playing sound:', err?.message || err);
     }
   }, []);
 

@@ -23,13 +23,33 @@ const markReadSchema = z.object({
 
 // ===== Endpoints =====
 
+// GET /notifications/count - Get unread count (MUST be BEFORE /:id routes)
+router.get('/count', async (req, res) => {
+  const { id: userId } = req.user;
+
+  try {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+
+    if (error) throw error;
+
+    res.json({ unreadCount: count || 0 });
+  } catch (err) {
+    console.error('Get unread count error:', err);
+    res.status(500).json({ error: 'Failed to get unread count' });
+  }
+});
+
 // GET /notifications - List user's notifications with pagination
 router.get('/', validate(paginationSchema, 'query'), async (req, res) => {
   const { id: userId } = req.user;
   const { limit, offset, filter } = req.query;
 
   try {
-    // Build query
+    // Build query to get filtered notifications
     let query = supabase
       .from('notifications')
       .select('*', { count: 'exact' })
@@ -48,7 +68,7 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res) => {
 
     if (error) throw error;
 
-    // Get unread count
+    // Get total unread count (not filtered)
     const { count: unreadCount, error: countError } = await supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
@@ -60,7 +80,7 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res) => {
     res.json({
       notifications,
       pagination: {
-        total: count,
+        total: count || 0,
         limit,
         offset,
         unreadCount: unreadCount || 0,
@@ -69,26 +89,6 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res) => {
   } catch (err) {
     console.error('Get notifications error:', err);
     res.status(500).json({ error: 'Failed to fetch notifications' });
-  }
-});
-
-// GET /notifications/count - Get unread count
-router.get('/count', async (req, res) => {
-  const { id: userId } = req.user;
-
-  try {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-
-    if (error) throw error;
-
-    res.json({ unreadCount: count || 0 });
-  } catch (err) {
-    console.error('Get unread count error:', err);
-    res.status(500).json({ error: 'Failed to get unread count' });
   }
 });
 
@@ -255,12 +255,14 @@ router.post('/test', async (req, res) => {
 
     if (error) throw error;
 
-    // Emit socket event
+    // Emit socket event with full notification data
     emitToUser(userId, 'notification:new', {
       id: notification.id,
       type: notification.type,
       title: notification.title,
       message: notification.message,
+      is_read: notification.is_read,
+      created_at: notification.created_at,
       timestamp: notification.created_at,
       metadata: notification.metadata,
     });

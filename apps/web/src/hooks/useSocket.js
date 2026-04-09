@@ -12,10 +12,12 @@ export function useSocket() {
     addNotification,
     addNotificationRealtime,
     removeNotificationRealtime,
+    updateNotificationRealtime,
   } = useNotificationStore((state) => ({
     addNotification: state.addNotification,
     addNotificationRealtime: state.addNotificationRealtime,
     removeNotificationRealtime: state.removeNotificationRealtime,
+    updateNotificationRealtime: state.updateNotificationRealtime,
   }));
 
   const { playSound } = useNotificationSounds();
@@ -153,7 +155,17 @@ export function useSocket() {
     socket.on('notification:read', (data) => {
       try {
         // Notification marked as read on another tab/client
-        // Store will handle UI update if needed
+        if (data.notificationId) {
+          // Update the notification to mark as read
+          const { notifications } = useNotificationStore.getState();
+          const notif = notifications.find(n => n.id === data.notificationId);
+          if (notif) {
+            useNotificationStore.getState().updateNotificationRealtime({
+              ...notif,
+              is_read: true
+            });
+          }
+        }
       } catch (err) {
         console.error('Error handling notification:read event:', err);
       }
@@ -163,7 +175,9 @@ export function useSocket() {
     socket.on('notification:deleted', (data) => {
       try {
         // Remove from store for real-time sync
-        removeNotificationRealtime(data.notificationId);
+        if (data.notificationId) {
+          removeNotificationRealtime(data.notificationId);
+        }
       } catch (err) {
         console.error('Error handling notification:deleted event:', err);
       }
@@ -173,7 +187,15 @@ export function useSocket() {
     socket.on('notifications:read-all', (data) => {
       try {
         // All notifications marked as read on another tab/client
-        // Store will handle UI update if needed
+        const { notifications } = useNotificationStore.getState();
+        notifications.forEach(notif => {
+          if (!notif.is_read) {
+            useNotificationStore.getState().updateNotificationRealtime({
+              ...notif,
+              is_read: true
+            });
+          }
+        });
       } catch (err) {
         console.error('Error handling notifications:read-all event:', err);
       }
@@ -190,7 +212,7 @@ export function useSocket() {
       socket.off('notification:deleted');
       socket.off('notifications:read-all');
     };
-  }, [user, token, addNotification, addNotificationRealtime, removeNotificationRealtime, playSound, showNotification]);
+  }, [user, token, addNotification, addNotificationRealtime, removeNotificationRealtime, updateNotificationRealtime, playSound, showNotification]);
 
   return getSocket();
 }

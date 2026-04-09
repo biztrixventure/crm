@@ -81,6 +81,7 @@ export const useNotificationStore = create((set, get) => ({
   unreadCount: 0,
   loading: false,
   error: null,
+  totalCount: 0, // Track total notification count for pagination
 
   // UI state
   notificationsOpen: false,
@@ -139,6 +140,7 @@ export const useNotificationStore = create((set, get) => ({
 
         set({
           notifications,
+          totalCount: pagination.total || 0,
           unreadCount: pagination.unreadCount || 0,
           loading: false,
         });
@@ -321,8 +323,28 @@ export const useNotificationStore = create((set, get) => ({
   /**
    * Clear all notifications
    */
-  clearAll: () => {
-    set({ notifications: [], unreadCount: 0 });
+  clearAll: async () => {
+    const token = getAuthToken();
+    if (!token) {
+      set({ notifications: [], unreadCount: 0 });
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/notifications`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to clear notifications on server');
+      }
+
+      set({ notifications: [], unreadCount: 0, totalCount: 0 });
+    } catch (err) {
+      console.error('Clear all error:', err);
+      // Still clear locally even if server fails
+      set({ notifications: [], unreadCount: 0, totalCount: 0 });
+    }
   },
 
   // ===== Real-time Updates (from Socket.io) =====
@@ -341,11 +363,22 @@ export const useNotificationStore = create((set, get) => ({
    * Update notification in real-time
    */
   updateNotificationRealtime: (notification) => {
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === notification.id ? notification : n
-      ),
-    }));
+    set((state) => {
+      const oldNotification = state.notifications.find((n) => n.id === notification.id);
+      let unreadDelta = 0;
+
+      // If read status changed, adjust unread count
+      if (oldNotification && oldNotification.is_read !== notification.is_read) {
+        unreadDelta = notification.is_read ? -1 : 1;
+      }
+
+      return {
+        notifications: state.notifications.map((n) =>
+          n.id === notification.id ? notification : n
+        ),
+        unreadCount: Math.max(0, state.unreadCount + unreadDelta),
+      };
+    });
   },
 
   /**
