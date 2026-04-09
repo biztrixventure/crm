@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+/**
+ * Get API base URL - uses relative paths for proper proxy behavior
+ * In development: /api (proxied to http://localhost:4000)
+ * In production: /api (proxied by nginx to api container)
+ */
+const API_BASE_URL = '/api/v1';
 
 export const useNotificationStore = create((set, get) => ({
   // Persistent notifications from server
@@ -42,88 +47,135 @@ export const useNotificationStore = create((set, get) => ({
   // ===== Persistent Notifications API Methods =====
 
   /**
-   * Load notifications from server
+   * Load notifications from server with error handling
    */
   loadNotifications: async (limit = 20, offset = 0, filter = 'all') => {
     set({ loading: true, error: null });
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/notifications?limit=${limit}&offset=${offset}&filter=${filter}`,
-        {
+    let retries = 2;
+    let lastError;
+
+    while (retries >= 0) {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/notifications?limit=${limit}&offset=${offset}&filter=${filter}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const { notifications, pagination } = await response.json();
+
+        set({
+          notifications,
+          unreadCount: pagination.unreadCount || 0,
+          loading: false,
+        });
+
+        return { notifications, pagination };
+      } catch (err) {
+        lastError = err;
+        console.warn(`Load notifications error (attempt ${2 - retries}/2):`, err?.message);
+
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        retries--;
+      }
+    }
+
+    console.error('Load notifications failed:', lastError);
+    set({ error: lastError?.message || 'Failed to load notifications', loading: false });
+    throw lastError;
+  },
+
+  /**
+   * Get unread notification count with retry logic
+   */
+  loadUnreadCount: async () => {
+    let retries = 2;
+    let lastError;
+
+    while (retries >= 0) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/notifications/count`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to load notifications: ${response.status}`);
+        const { unreadCount } = await response.json();
+        set({ unreadCount });
+        return unreadCount;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Load unread count error (attempt ${2 - retries}/2):`, err?.message);
+
+        if (retries > 0) {
+          // Retry after 1 second
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        retries--;
       }
-
-      const { notifications, pagination } = await response.json();
-
-      set({
-        notifications,
-        unreadCount: pagination.unreadCount || 0,
-        loading: false,
-      });
-
-      return { notifications, pagination };
-    } catch (err) {
-      console.error('Load notifications error:', err);
-      set({ error: err.message, loading: false });
-      throw err;
     }
+
+    console.error('Load unread count failed after retries:', lastError);
+    return 0;
   },
 
   /**
-   * Get unread notification count
-   */
-  loadUnreadCount: async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/notifications/count`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to load unread count');
-
-      const { unreadCount } = await response.json();
-      set({ unreadCount });
-      return unreadCount;
-    } catch (err) {
-      console.error('Load unread count error:', err);
-      return 0;
-    }
-  },
-
-  /**
-   * Mark single notification as read
+   * Mark single notification as read with error handling
    */
   markAsRead: async (notificationId) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    let retries = 1;
+    let lastError;
 
-      if (!response.ok) throw new Error('Failed to mark as read');
+    while (retries >= 0) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      // Update local state
-      set((state) => ({
-        notifications: state.notifications.map((n) =>
-          n.id === notificationId ? { ...n, is_read: true } : n
-        ),
-        unreadCount: Math.max(0, state.unreadCount - 1),
-      }));
-    } catch (err) {
-      console.error('Mark as read error:', err);
-      throw err;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        // Update local state optimistically
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === notificationId ? { ...n, is_read: true } : n
+          ),
+          unreadCount: Math.max(0, state.unreadCount - 1),
+        }));
+
+        return;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Mark as read error (attempt ${1 - retries}/1):`, err?.message);
+
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        retries--;
+      }
     }
+
+    console.error('Mark as read failed:', lastError);
+    throw lastError;
   },
 
   /**

@@ -3,6 +3,7 @@ import { useEffect, useCallback } from 'react';
 /**
  * Hook to handle browser notification permissions
  * Requests permission on first login and manages permission state
+ * Gracefully handles browsers that don't support notifications
  */
 export function useNotificationPermissions() {
   /**
@@ -12,24 +13,27 @@ export function useNotificationPermissions() {
   const requestPermission = useCallback(async () => {
     // Check if browser supports notifications
     if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
+      console.log('ℹ This browser does not support notifications');
       return false;
     }
 
     // If already granted, return true
     if (Notification.permission === 'granted') {
+      console.log('✓ Notifications already granted');
       return true;
     }
 
-    // If denied, don't ask again
+    // If previously denied, don't spam with prompts
     if (Notification.permission === 'denied') {
-      console.log('Notifications are denied by user');
+      console.log('ℹ Notifications previously denied by user');
       return false;
     }
 
     // Request permission
     try {
+      console.log('🔔 Requesting notification permission...');
       const permission = await Notification.requestPermission();
+      console.log(`Notification permission: ${permission}`);
       return permission === 'granted';
     } catch (err) {
       console.error('Failed to request notification permission:', err);
@@ -38,17 +42,22 @@ export function useNotificationPermissions() {
   }, []);
 
   /**
-   * Show browser notification
+   * Show browser notification with error handling
    * @param {object} options - Notification options
    * @param {string} options.title - Notification title
    * @param {string} options.message - Notification message/body
    * @param {string} options.icon - Icon URL
-   * @param {string} options.tag - Notification tag (for replacing duplicates)
+   * @param {string} options.tag - Notification tag (for grouping duplicates)
    */
   const showNotification = useCallback(
     (options) => {
-      // Check if notifications are permitted
-      if (!('Notification' in window) || Notification.permission !== 'granted') {
+      // Check if notifications are available and permitted
+      if (!('Notification' in window)) {
+        return null;
+      }
+
+      if (Notification.permission !== 'granted') {
+        // Silently skip if not granted (user denied or didn't respond)
         return null;
       }
 
@@ -61,9 +70,13 @@ export function useNotificationPermissions() {
           badge: '/logo.png',
         });
 
-        // Auto-close after 5 seconds
+        // Auto-close after 5 seconds if user doesn't interact
         const timeout = setTimeout(() => {
-          notification.close();
+          try {
+            notification.close();
+          } catch (e) {
+            // Notification already closed, ignore
+          }
         }, 5000);
 
         // Clear timeout if notification is manually closed
@@ -74,12 +87,16 @@ export function useNotificationPermissions() {
         // Click handler - focus window
         notification.addEventListener('click', () => {
           window.focus();
-          notification.close();
+          try {
+            notification.close();
+          } catch (e) {
+            // Already closed, ignore
+          }
         });
 
         return notification;
       } catch (err) {
-        console.error('Failed to show notification:', err);
+        console.warn('Failed to show notification:', err);
         return null;
       }
     },
@@ -97,21 +114,30 @@ export function useNotificationPermissions() {
   }, []);
 
   /**
-   * Initialize on component mount
-   * Request permission if not already done
+   * Initialize permission request on component mount
+   * Only asks once per user, respects browser decisions
    */
   useEffect(() => {
-    // Check if user has already been asked
-    const permissionAsked = localStorage.getItem('notification_permission_asked');
+    // Only request if we haven't asked yet and browser supports notifications
+    if (!('Notification' in window)) {
+      return;
+    }
 
-    if (!permissionAsked && getPermissionStatus() === 'default') {
-      // Mark that we've asked
+    const permissionAsked = localStorage.getItem('notification_permission_asked');
+    const status = getPermissionStatus();
+
+    if (!permissionAsked && status === 'default') {
+      // Mark that we've asked (even if user doesn't respond immediately)
       localStorage.setItem('notification_permission_asked', 'true');
 
-      // Request permission on next tick to avoid blocking UI
-      setTimeout(() => {
-        requestPermission();
-      }, 500);
+      // Delay request to avoid blocking UI
+      const timer = setTimeout(() => {
+        requestPermission().catch((err) => {
+          console.error('Permission request error:', err);
+        });
+      }, 1000);
+
+      return () => clearTimeout(timer);
     }
   }, [requestPermission, getPermissionStatus]);
 
