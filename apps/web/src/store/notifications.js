@@ -7,6 +7,56 @@ import { create } from 'zustand';
  */
 const API_BASE_URL = '/api/v1';
 
+/**
+ * Get auth token from localStorage
+ * @returns {string|null} JWT token or null if not available
+ */
+function getAuthToken() {
+  try {
+    // First try sessionStorage (immediate)
+    let token = sessionStorage.getItem('token');
+    if (token) return token;
+
+    // Then try localStorage (persistent)
+    token = localStorage.getItem('token');
+    if (token) return token;
+
+    // Check if zustand auth store has token
+    const { useAuthStore } = require('../store/auth');
+    const authToken = useAuthStore.getState()?.token;
+    if (authToken) return authToken;
+
+    return null;
+  } catch (err) {
+    console.warn('Failed to get auth token:', err);
+    return null;
+  }
+}
+
+/**
+ * Make authenticated API request with retry logic
+ */
+async function fetchWithAuth(url, options = {}) {
+  const token = getAuthToken();
+
+  // Return early if no token available
+  if (!token) {
+    throw new Error('No authentication token available');
+  }
+
+  const headers = {
+    ...options.headers,
+    Authorization: `Bearer ${token}`,
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  return response;
+}
+
 export const useNotificationStore = create((set, get) => ({
   // Persistent notifications from server
   notifications: [],
@@ -47,7 +97,7 @@ export const useNotificationStore = create((set, get) => ({
   // ===== Persistent Notifications API Methods =====
 
   /**
-   * Load notifications from server with error handling
+   * Load notifications from server with error handling and auth check
    */
   loadNotifications: async (limit = 20, offset = 0, filter = 'all') => {
     set({ loading: true, error: null });
@@ -56,16 +106,14 @@ export const useNotificationStore = create((set, get) => ({
 
     while (retries >= 0) {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/notifications?limit=${limit}&offset=${offset}&filter=${filter}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          }
+        const response = await fetchWithAuth(
+          `${API_BASE_URL}/notifications?limit=${limit}&offset=${offset}&filter=${filter}`
         );
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Unauthorized - please log in again');
+          }
           throw new Error(`HTTP ${response.status}`);
         }
 
@@ -80,6 +128,13 @@ export const useNotificationStore = create((set, get) => ({
         return { notifications, pagination };
       } catch (err) {
         lastError = err;
+
+        // Don't retry auth errors
+        if (err.message.includes('Unauthorized') || err.message.includes('No authentication token')) {
+          set({ error: err.message, loading: false });
+          throw err;
+        }
+
         console.warn(`Load notifications error (attempt ${2 - retries}/2):`, err?.message);
 
         if (retries > 0) {
@@ -96,7 +151,7 @@ export const useNotificationStore = create((set, get) => ({
   },
 
   /**
-   * Get unread notification count with retry logic
+   * Get unread notification count with retry logic and auth check
    */
   loadUnreadCount: async () => {
     let retries = 2;
@@ -104,13 +159,13 @@ export const useNotificationStore = create((set, get) => ({
 
     while (retries >= 0) {
       try {
-        const response = await fetch(`${API_BASE_URL}/notifications/count`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/notifications/count`);
 
         if (!response.ok) {
+          if (response.status === 401) {
+            console.warn('Notifications: Authentication required (401)');
+            return 0; // Don't retry auth errors
+          }
           throw new Error(`HTTP ${response.status}`);
         }
 
@@ -119,6 +174,18 @@ export const useNotificationStore = create((set, get) => ({
         return unreadCount;
       } catch (err) {
         lastError = err;
+
+        // Don't retry auth errors
+        if (err.message.includes('No authentication token')) {
+          console.warn('Notifications: No token, skipping load');
+          return 0;
+        }
+
+        if (err.message.includes('401')) {
+          console.warn('Notifications: Auth failed, skip retries');
+          return 0;
+        }
+
         console.warn(`Load unread count error (attempt ${2 - retries}/2):`, err?.message);
 
         if (retries > 0) {
@@ -143,10 +210,9 @@ export const useNotificationStore = create((set, get) => ({
 
     while (retries >= 0) {
       try {
-        const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/notifications/${notificationId}/read`, {
           method: 'PATCH',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
           },
         });
@@ -164,6 +230,10 @@ export const useNotificationStore = create((set, get) => ({
         return;
       } catch (err) {
         lastError = err;
+        if (err.message.includes('Unauthorized') || err.message.includes('No authentication token')) {
+          throw err;
+        }
+
         console.warn(`Mark as read error (attempt ${1 - retries}/1):`, err?.message);
 
         if (retries > 0) {
@@ -183,10 +253,9 @@ export const useNotificationStore = create((set, get) => ({
    */
   markAllRead: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/notifications/read-all`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -209,11 +278,8 @@ export const useNotificationStore = create((set, get) => ({
    */
   deleteNotification: async (notificationId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/notifications/${notificationId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
       });
 
       if (!response.ok) throw new Error('Failed to delete notification');
