@@ -8,40 +8,60 @@ import { create } from 'zustand';
 const API_BASE_URL = '/api/v1';
 
 /**
- * Get auth token from localStorage
+ * Get auth token from localStorage (from zustand persist)
+ * Tries multiple storage keys for compatibility
  * @returns {string|null} JWT token or null if not available
  */
 function getAuthToken() {
   try {
-    // First try sessionStorage (immediate)
-    let token = sessionStorage.getItem('token');
-    if (token) return token;
+    // Try different possible zustand persist keys
+    const possibleKeys = ['auth-store', 'useAuthStore', 'token'];
 
-    // Then try localStorage (persistent)
-    token = localStorage.getItem('token');
-    if (token) return token;
+    for (const key of possibleKeys) {
+      const stored = localStorage.getItem(key);
+      if (!stored) continue;
 
-    // Check if zustand auth store has token
-    const { useAuthStore } = require('../store/auth');
-    const authToken = useAuthStore.getState()?.token;
-    if (authToken) return authToken;
+      // If it's the token key directly, just return it
+      if (key === 'token') {
+        return stored;
+      }
 
+      // Otherwise it's JSON from zustand persist
+      try {
+        const parsed = JSON.parse(stored);
+        // Zustand v4+ uses { state: {...} } structure
+        const token = parsed?.state?.token || parsed?.token;
+        if (token) {
+          console.debug(`Found token in localStorage key: ${key}`);
+          return token;
+        }
+      } catch (e) {
+        // Continue to next key
+      }
+    }
+
+    console.debug('No valid token found in localStorage');
     return null;
   } catch (err) {
-    console.warn('Failed to get auth token:', err);
+    console.warn('Failed to get auth token:', err.message);
     return null;
   }
 }
 
 /**
- * Make authenticated API request with retry logic
+ * Make authenticated API request
  */
 async function fetchWithAuth(url, options = {}) {
   const token = getAuthToken();
 
-  // Return early if no token available
+  // If no token, return a rejected response to match fetch() behavior
   if (!token) {
-    throw new Error('No authentication token available');
+    console.warn('fetchWithAuth: No token available');
+    // Return a fake 401 response that matches fetch() API
+    return new Response(JSON.stringify({ error: 'Unauthorized - no token' }), {
+      status: 401,
+      statusText: 'Unauthorized',
+    });
   }
 
   const headers = {
@@ -49,12 +69,10 @@ async function fetchWithAuth(url, options = {}) {
     Authorization: `Bearer ${token}`,
   };
 
-  const response = await fetch(url, {
+  return fetch(url, {
     ...options,
     headers,
   });
-
-  return response;
 }
 
 export const useNotificationStore = create((set, get) => ({

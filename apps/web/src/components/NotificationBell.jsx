@@ -17,19 +17,59 @@ export default function NotificationBell() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Load unread count on mount
+  // Load unread count on mount (only if we have a token)
   useEffect(() => {
-    loadUnreadCount();
+    // Check if we have a valid token in localStorage before loading
+    const hasToken = () => {
+      try {
+        // Try different possible zustand persist keys
+        let token = localStorage.getItem('token');
+        if (token) return true;
 
-    // Refresh unread count every 30 seconds
-    const interval = setInterval(loadUnreadCount, 30000);
-    return () => clearInterval(interval);
+        const authStore = localStorage.getItem('auth-store');
+        if (authStore) {
+          const parsed = JSON.parse(authStore);
+          token = parsed?.state?.token || parsed?.token;
+          if (token) return true;
+        }
+
+        const useAuthStore = localStorage.getItem('useAuthStore');
+        if (useAuthStore) {
+          const parsed = JSON.parse(useAuthStore);
+          token = parsed?.state?.token || parsed?.token;
+          if (token) return true;
+        }
+
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    // Only load if we have a token
+    if (hasToken()) {
+      loadUnreadCount().catch((err) => {
+        console.warn('Failed to load unread count:', err?.message);
+      });
+
+      // Refresh unread count every 30 seconds
+      const interval = setInterval(() => {
+        loadUnreadCount().catch((err) => {
+          console.warn('Failed to refresh unread count:', err?.message);
+        });
+      }, 30000);
+      return () => clearInterval(interval);
+    }
   }, [loadUnreadCount]);
 
   // Load recent notifications when dropdown opens
   useEffect(() => {
     if (showDropdown && notifications.length === 0) {
-      loadNotifications(5, 0, 'all');
+      // Only try to load if we likely have a token
+      loadNotifications(5, 0, 'all').catch((err) => {
+        console.warn('Failed to load notifications:', err?.message);
+        // Silently fail - user may not be authenticated yet
+      });
     }
   }, [showDropdown, loadNotifications, notifications.length]);
 
