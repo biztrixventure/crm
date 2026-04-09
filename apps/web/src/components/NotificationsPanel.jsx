@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { XIcon, Loader2Icon, CheckAllIcon, Trash2Icon } from 'lucide-react';
+import { XIcon, Loader2Icon, CheckCheck, Trash } from 'lucide-react';
 import { useNotificationStore } from '../store/notifications';
 import NotificationItem from './NotificationItem';
 import { cn } from '../lib/utils';
@@ -95,7 +95,7 @@ export default function NotificationsPanel({ onClose }) {
                 className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-200 dark:hover:bg-dark-700 rounded-lg transition-colors"
                 title="Mark all as read"
               >
-                <CheckAllIcon size={20} />
+                <CheckCheck size={20} />
               </button>
             )}
           </div>
