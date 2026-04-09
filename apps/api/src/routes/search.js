@@ -2,6 +2,8 @@ import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
+import { searchLimiter } from '../middleware/rateLimit.js';
+import { normalizePhoneE164 } from '../lib/phoneUtil.js';
 
 const router = Router();
 
@@ -22,6 +24,7 @@ function normalizePhoneLocal(phone) {
 // GET /search/number - Search for customer by phone number (sold/not sold status)
 router.get(
   '/number',
+  searchLimiter,
   roleGuard('super_admin', 'company_admin', 'closer', 'closer_manager', 'compliance_manager', 'compliance_agent', 'operations_manager'),
   async (req, res) => {
     const { phone } = req.query;

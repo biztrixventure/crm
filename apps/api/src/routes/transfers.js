@@ -5,8 +5,7 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard, featureGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createTransferSchema, updateTransferSchema, transferQuerySchema } from '../schemas/transfer.schema.js';
-import { notifyTransferCreatedPersistent, createNotification } from '../services/notification.js';
-import { emitToUser } from '../services/socket.js';
+import { notifyTransferCreatedPersistent, createNotification, emitToUser } from '../services/notification.js';
 
 const router = Router();
 

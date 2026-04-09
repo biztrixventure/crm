@@ -1,17 +1,18 @@
 import Redis from 'ioredis';
+import { CONFIG } from '../lib/config.js';
 
 let redis = null;
 let redisConnected = false;
 
 export function initRedis() {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-  
+  const redisUrl = CONFIG.REDIS_URL;
+
   try {
     redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
       retryDelayOnFailover: 100,
       lazyConnect: true,
-      connectTimeout: 5000,
+      connectTimeout: CONFIG.REDIS_CONNECT_TIMEOUT,
     });
 
     redis.on('connect', () => {
@@ -59,14 +60,14 @@ export async function markNumberSold(phoneE164, sold = true) {
   try {
     const key = `sold:${phoneE164}`;
     const value = sold ? 'yes' : 'no';
-    await redis.set(key, value, 'EX', 86400); // 24h TTL
+    await redis.set(key, value, 'EX', CONFIG.NUMBER_SOLD_TTL); // TTL per config
   } catch (err) {
     console.warn('Redis markNumberSold failed:', err.message);
   }
 }
 
 // Session management
-export async function setSession(userId, token, ttlSeconds = 28800) {
+export async function setSession(userId, token, ttlSeconds = CONFIG.SESSION_TTL) {
   if (!isRedisConnected()) return;
   try {
     const key = `session:${userId}`;

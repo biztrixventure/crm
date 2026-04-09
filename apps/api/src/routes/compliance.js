@@ -9,6 +9,7 @@ import {
   createNotification,
 } from '../services/notification.js';
 import { createBatchSchema, submitReviewSchema, addDncSchema } from '../schemas/compliance.schema.js';
+import { getPagination } from '../lib/pagination.js';
 
 const router = Router();
 
@@ -74,8 +75,7 @@ router.use(ensureComplianceRole);
 // GET /compliance/records - Closer records [manager: all, agent: assigned batches only]
 router.get('/records', async (req, res) => {
   const { role, id: userId } = req.user;
-  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-  const offset = parseInt(req.query.offset) || 0;
+  const { limit, offset } = getPagination(req.query);
   const { company_id, from, to, status } = req.query;
 
   try {

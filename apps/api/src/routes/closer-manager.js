@@ -5,6 +5,7 @@ import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { notifyCloserManagerEvent, notifySaleMade, createNotification } from '../services/notification.js';
 import { createCloserSchema } from '../schemas/closer-manager.schema.js';
+import { getPagination, getPaginationMeta } from '../lib/pagination.js';
 
 const router = Router();
 
@@ -110,8 +111,7 @@ async function getCloserPerformanceStats(closerId, period = 'today') {
 
 // GET /closer-manager/closers - List all closers managed by this manager
 router.get('/closers', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-  const offset = parseInt(req.query.offset) || 0;
+  const { limit, offset } = getPagination(req.query);
   const { id: managerId } = req.user;
 
   try {

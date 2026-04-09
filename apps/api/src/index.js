@@ -3,9 +3,11 @@ import './startup-check.js'; // Run startup verification first
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { createServer } from 'http';
 import { initSocket } from './services/socket.js';
 import { initRedis } from './services/redis.js';
+import { CONFIG } from './lib/config.js';
 
 // Validate required environment variables at startup
 function validateEnvironment() {
@@ -74,18 +76,29 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true,
+  origin: CONFIG.CORS_ORIGIN,
+  credentials: CONFIG.CORS_CREDENTIALS,
 }));
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Compression middleware - reduces response size for CSV exports and large JSON
+if (CONFIG.ENABLE_COMPRESSION) {
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
+    },
+    threshold: 1024, // 1KB minimum size to compress
+  }));
+}
 
-// Request timeout middleware - set 30 second timeout
+// Body parsing with size limits to prevent DOS attacks
+app.use(express.json({ limit: CONFIG.REQUEST_BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: CONFIG.REQUEST_BODY_LIMIT }));
+
+// Request timeout middleware
 app.use((req, res, next) => {
-  req.setTimeout(30000); // 30 seconds
-  res.setTimeout(30000);
+  req.setTimeout(CONFIG.REQUEST_TIMEOUT);
+  res.setTimeout(CONFIG.REQUEST_TIMEOUT);
   next();
 });
 
