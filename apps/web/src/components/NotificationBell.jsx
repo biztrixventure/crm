@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BellIcon } from 'lucide-animated';
+import { useAuthStore } from '../store/auth';
 import { useNotificationStore } from '../store/notifications';
 import NotificationsPanel from './NotificationsPanel';
 import { cn } from '../lib/utils';
@@ -19,43 +20,18 @@ export default function NotificationBell() {
 
   // Load unread count on mount (only if we have a token)
   useEffect(() => {
-    // Check if we have a valid token in localStorage before loading
-    const hasToken = () => {
-      try {
-        // Try different possible zustand persist keys
-        let token = localStorage.getItem('token');
-        if (token) return true;
+    // Check if we have a valid token before loading
+    const { token } = useAuthStore.getState ? useAuthStore.getState() : { token: null };
 
-        const authStore = localStorage.getItem('auth-store');
-        if (authStore) {
-          const parsed = JSON.parse(authStore);
-          token = parsed?.state?.token || parsed?.token;
-          if (token) return true;
-        }
-
-        const useAuthStore = localStorage.getItem('useAuthStore');
-        if (useAuthStore) {
-          const parsed = JSON.parse(useAuthStore);
-          token = parsed?.state?.token || parsed?.token;
-          if (token) return true;
-        }
-
-        return false;
-      } catch {
-        return false;
-      }
-    };
-
-    // Only load if we have a token
-    if (hasToken()) {
+    if (token) {
       loadUnreadCount().catch((err) => {
-        console.warn('Failed to load unread count:', err?.message);
+        console.debug('Failed to load unread count:', err?.message);
       });
 
       // Refresh unread count every 30 seconds
       const interval = setInterval(() => {
         loadUnreadCount().catch((err) => {
-          console.warn('Failed to refresh unread count:', err?.message);
+          console.debug('Failed to refresh unread count:', err?.message);
         });
       }, 30000);
       return () => clearInterval(interval);

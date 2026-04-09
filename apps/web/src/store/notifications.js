@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAuthStore } from './auth';
 
 /**
  * Get API base URL - uses relative paths for proper proxy behavior
@@ -8,13 +9,19 @@ import { create } from 'zustand';
 const API_BASE_URL = '/api/v1';
 
 /**
- * Get auth token from localStorage (from zustand persist)
- * Tries multiple storage keys for compatibility
+ * Get auth token from auth store
  * @returns {string|null} JWT token or null if not available
  */
 function getAuthToken() {
   try {
-    // Try different possible zustand persist keys
+    // Get token directly from auth store (most reliable)
+    const { token } = useAuthStore.getState();
+    
+    if (token) {
+      return token;
+    }
+
+    // Fallback to localStorage for persistence edge cases
     const possibleKeys = ['auth-store', 'useAuthStore', 'token'];
 
     for (const key of possibleKeys) {
@@ -40,7 +47,7 @@ function getAuthToken() {
       }
     }
 
-    console.debug('No valid token found in localStorage');
+    console.debug('No valid token found in auth store or localStorage');
     return null;
   } catch (err) {
     console.warn('Failed to get auth token:', err.message);
@@ -119,6 +126,13 @@ export const useNotificationStore = create((set, get) => ({
    * Load notifications from server with error handling and auth check
    */
   loadNotifications: async (limit = 20, offset = 0, filter = 'all') => {
+    // Check if token is available before attempting
+    const token = getAuthToken();
+    if (!token) {
+      console.debug('Notifications: No token available, skipping load');
+      return { notifications: [], pagination: { total: 0, limit, offset, unreadCount: 0 } };
+    }
+
     set({ loading: true, error: null });
     let retries = 2;
     let lastError;
@@ -152,7 +166,8 @@ export const useNotificationStore = create((set, get) => ({
         // Don't retry auth errors
         if (err.message.includes('Unauthorized') || err.message.includes('No authentication token')) {
           set({ error: err.message, loading: false });
-          throw err;
+          console.warn('Load notifications: Auth error, skipping retries');
+          return { notifications: [], pagination: { total: 0, limit, offset, unreadCount: 0 } };
         }
 
         console.warn(`Load notifications error (attempt ${2 - retries}/2):`, err?.message);
@@ -167,13 +182,20 @@ export const useNotificationStore = create((set, get) => ({
 
     console.error('Load notifications failed:', lastError);
     set({ error: lastError?.message || 'Failed to load notifications', loading: false });
-    throw lastError;
+    return { notifications: [], pagination: { total: 0, limit, offset, unreadCount: 0 } };
   },
 
   /**
    * Get unread notification count with retry logic and auth check
    */
   loadUnreadCount: async () => {
+    // Check if token is available before attempting
+    const token = getAuthToken();
+    if (!token) {
+      console.debug('Notifications: No token available, returning 0');
+      return 0;
+    }
+
     let retries = 2;
     let lastError;
 
