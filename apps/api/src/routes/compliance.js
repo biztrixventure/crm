@@ -3,7 +3,11 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
-import { notifyComplianceManagerEvent, notifyComplianceAgentEvent } from '../services/notification.js';
+import {
+  notifyComplianceManagerEvent,
+  notifyComplianceAgentEvent,
+  createNotification,
+} from '../services/notification.js';
 import { createBatchSchema, submitReviewSchema, addDncSchema } from '../schemas/compliance.schema.js';
 
 const router = Router();
@@ -423,13 +427,28 @@ router.patch('/batches/:id/assign', ensureComplianceManager, async (req, res) =>
       return res.status(404).json({ error: 'Batch not found' });
     }
 
-    // Notify agent
+    // Notify agent - legacy socket event
     await notifyComplianceAgentEvent({
       eventType: 'batch_assigned',
       message: `New compliance batch assigned to you (${updated[0].total_records} records)`,
       userId: assign_to,
       batchId,
     });
+
+    // Create persistent notification for agent
+    await createNotification(
+      assign_to,
+      'batch:assigned',
+      'Compliance Batch Assigned',
+      `New compliance batch assigned with ${updated[0].total_records || 0} records to review`,
+      {
+        batchId,
+        totalRecords: updated[0].total_records,
+        companyId: batch.company_id,
+      },
+      batch.company_id,
+      'compliance_agent'
+    );
 
     res.json({
       batch: updated[0],
@@ -447,10 +466,10 @@ router.patch('/batches/:id/complete', ensureComplianceAgent, async (req, res) =>
   const { id: userId } = req.user;
 
   try {
-    // Get batch - verify it's assigned to agent
+    // Get batch - verify it's assigned to agent and get company_id
     const { data: batch, error: batchError } = await supabase
       .from('compliance_batches')
-      .select('id, assigned_to')
+      .select('id, assigned_to, company_id')
       .eq('id', batchId)
       .single();
 
@@ -487,7 +506,7 @@ router.patch('/batches/:id/complete', ensureComplianceAgent, async (req, res) =>
 
     if (updateError) throw updateError;
 
-    // Notify manager who created batch
+    // Notify manager who created batch - legacy socket event
     const { data: batchData } = await supabase
       .from('compliance_batches')
       .select('created_by')
@@ -501,6 +520,20 @@ router.patch('/batches/:id/complete', ensureComplianceAgent, async (req, res) =>
         userId: batchData.created_by,
         batchId,
       });
+
+      // Create persistent notification for manager
+      await createNotification(
+        batchData.created_by,
+        'batch:completed',
+        'Compliance Batch Completed',
+        'A compliance agent has completed their assigned batch review',
+        {
+          batchId,
+          agentId: userId,
+        },
+        batch.company_id,
+        'compliance_manager'
+      );
     }
 
     res.json({

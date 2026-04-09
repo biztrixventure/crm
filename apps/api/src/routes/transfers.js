@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard, featureGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createTransferSchema, updateTransferSchema, transferQuerySchema } from '../schemas/transfer.schema.js';
-import { notifyTransferCreated } from '../services/notification.js';
+import { notifyTransferCreatedPersistent } from '../services/notification.js';
 
 const router = Router();
 
@@ -149,8 +149,14 @@ router.post('/', roleGuard('fronter'), validate(createTransferSchema), async (re
 
     if (error) throw error;
 
-    // Notify closer about new transfer
-    notifyTransferCreated(transferData.closer_id, transfer, company?.display_name || 'Unknown');
+    // Notify closer about new transfer (persistent)
+    await notifyTransferCreatedPersistent(
+      transferData.closer_id,
+      transfer,
+      company?.display_name || 'Unknown',
+      companyId,
+      'closer'
+    );
 
     res.status(201).json({ transfer });
   } catch (err) {

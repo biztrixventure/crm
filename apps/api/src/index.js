@@ -46,6 +46,7 @@ import searchRoutes from './routes/search.js';
 import closerManagerRoutes from './routes/closer-manager.js';
 import operationsRoutes from './routes/operations.js';
 import complianceRoutes from './routes/compliance.js';
+import notificationRoutes from './routes/notifications.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -109,6 +110,7 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/closer-manager', closerManagerRoutes);
 app.use('/api/v1/operations', operationsRoutes);
 app.use('/api/v1/compliance', complianceRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // 404 handler
 app.use((req, res) => {

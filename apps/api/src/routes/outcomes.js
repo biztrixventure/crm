@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createOutcomeSchema, outcomeQuerySchema } from '../schemas/outcome.schema.js';
-import { notifySaleMade } from '../services/notification.js';
+import { notifySaleMadePersistent } from '../services/notification.js';
 import { markNumberSold } from '../services/redis.js';
 
 const router = Router();
@@ -159,7 +159,7 @@ router.post('/', roleGuard('closer', 'closer_manager'), validate(createOutcomeSc
     // If Sale Made, mark number as sold in Redis and notify company
     if (disposition.label === 'Sale Made') {
       await markNumberSold(normalizedPhone, true);
-      
+
       // Get closer name for notification
       const { data: closer } = await supabase
         .from('users')
@@ -167,7 +167,7 @@ router.post('/', roleGuard('closer', 'closer_manager'), validate(createOutcomeSc
         .eq('id', closerId)
         .single();
 
-      notifySaleMade(company_id, outcome, closer?.full_name || 'Unknown');
+      await notifySaleMadePersistent(company_id, outcome, closer?.full_name || 'Unknown', disposition);
     }
 
     res.status(201).json({ outcome });

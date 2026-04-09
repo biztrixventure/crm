@@ -3,7 +3,7 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
-import { notifyCloserManagerEvent, notifySaleMade } from '../services/notification.js';
+import { notifyCloserManagerEvent, notifySaleMade, createNotification } from '../services/notification.js';
 import { createCloserSchema } from '../schemas/closer-manager.schema.js';
 
 const router = Router();
@@ -220,6 +220,22 @@ router.post('/closers', validate(createCloserSchema), async (req, res) => {
         userId: creatorId,
         closerId: userId,
       });
+
+      // Create persistent notification
+      await createNotification(
+        creatorId,
+        'team:event',
+        'New Closer Created',
+        `New closer account created: ${full_name}`,
+        {
+          closerId: userId,
+          closerName: full_name,
+          eventType: 'new_closer_created',
+        },
+        null,
+        'closer_manager'
+      );
+
       console.log('   ✅ Notification sent');
     } catch (notifyErr) {
       console.warn('   ⚠️  Notification failed (non-critical):', notifyErr.message);

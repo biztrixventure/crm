@@ -93,6 +93,30 @@ async function processCallbacks() {
           continue;
         }
 
+        // Create persistent notification
+        try {
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert({
+              user_id: callback.created_by,
+              role: 'closer', // Will be updated when we fetch the user's actual role
+              type: 'callback:due',
+              title: 'Callback Reminder',
+              message: `Callback reminder: ${callback.customer_name}`,
+              metadata: {
+                callbackId: callback.id,
+                customerName: callback.customer_name,
+                customerPhone: callback.customer_phone,
+              },
+            });
+
+          if (notifError) {
+            console.warn(`Failed to create persistent notification for ${callbackId}:`, notifError);
+          }
+        } catch (notifErr) {
+          console.warn(`Error creating persistent notification for ${callbackId}:`, notifErr);
+        }
+
         // Emit notification to user
         if (socket && socket.connected) {
           socket.emit('callback:fire', {

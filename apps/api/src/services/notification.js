@@ -1,4 +1,5 @@
 import { getIO, notifyRole } from './socket.js';
+import supabase from './supabase.js';
 
 export function emitToUser(userId, event, data) {
   const io = getIO();
@@ -120,15 +121,201 @@ export function notifyComplianceAgentEvent({ eventType, message, userId, batchId
   }
 }
 
+// ===== Persistent Notification Functions =====
+
+/**
+ * Create persistent notification in database and emit socket event
+ * @param {string} userId - User to notify
+ * @param {string} type - Notification type (transfer:new, callback:due, etc)
+ * @param {string} title - Display title
+ * @param {string} message - Display message
+ * @param {object} metadata - Additional data (transferId, callbackId, etc)
+ * @param {string} companyId - Optional company ID
+ * @param {string} role - User's role
+ */
+export async function createNotification(userId, type, title, message, metadata = {}, companyId = null, role = null) {
+  try {
+    // Create notification in database
+    const { data: notification, error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        company_id: companyId,
+        role: role || 'user',
+        type,
+        title,
+        message,
+        metadata,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Emit socket event for real-time delivery
+    emitToUser(userId, 'notification:new', {
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      timestamp: notification.created_at,
+      metadata: notification.metadata,
+    });
+
+    return notification;
+  } catch (err) {
+    console.error('Create notification error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Create notification for a single user with persistence
+ */
+export async function notifyUserPersistent(userId, type, title, message, metadata = {}, companyId = null, role = null) {
+  return createNotification(userId, type, title, message, metadata, companyId, role);
+}
+
+/**
+ * Create notification for all users with a specific role
+ */
+export async function notifyRolePersistent(roleName, type, title, message, metadata = {}, userIds = []) {
+  try {
+    // If specific userIds provided, notify only those
+    if (userIds.length > 0) {
+      for (const userId of userIds) {
+        await createNotification(userId, type, title, message, metadata, null, roleName);
+      }
+      return;
+    }
+
+    // Otherwise, query all users with that role
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', roleName);
+
+    if (error) throw error;
+
+    // Create notifications for each user
+    for (const user of users || []) {
+      await createNotification(user.id, type, title, message, metadata, null, roleName);
+    }
+  } catch (err) {
+    console.error('Notify role persistent error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Create notification for all users in a company
+ */
+export async function notifyCompanyPersistent(companyId, type, title, message, metadata = {}) {
+  try {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('company_id', companyId);
+
+    if (error) throw error;
+
+    // Create notifications for each user
+    for (const user of users || []) {
+      await createNotification(user.id, type, title, message, metadata, companyId, user.role);
+    }
+  } catch (err) {
+    console.error('Notify company persistent error:', err);
+    throw err;
+  }
+}
+
+// ===== Enhanced Event Notification Functions =====
+
+// Transfer submitted - notify the selected closer (PERSISTENT)
+export async function notifyTransferCreatedPersistent(closerId, transfer, companyName, companyId, closer_role = 'closer') {
+  const title = 'New Transfer';
+  const message = `New transfer incoming from ${companyName}`;
+
+  await createNotification(
+    closerId,
+    'transfer:new',
+    title,
+    message,
+    { transferId: transfer.id, customerId: transfer.customer_name, companyName },
+    companyId,
+    closer_role
+  );
+
+  // Still emit for legacy socket listeners
+  emitToUser(closerId, 'transfer:new', {
+    message,
+    transfer,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// Sale made - notify company admin (PERSISTENT)
+export async function notifySaleMadePersistent(companyId, outcome, closerName, dispositions) {
+  const title = 'Sale Recorded';
+  const message = `Sale recorded by ${closerName} for your lead`;
+
+  // Notify company admins
+  await notifyCompanyPersistent(
+    companyId,
+    'sale:made',
+    title,
+    message,
+    { outcomeId: outcome.id, closerId: outcome.closer_id, disposition: dispositions ? dispositions.label : 'Sale Made' }
+  );
+
+  // Still emit for legacy socket listeners
+  emitToCompany(companyId, 'sale:made', {
+    message,
+    outcome,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// Callback due - notify the user who created it (PERSISTENT)
+export async function notifyCallbackDuePersistent(userId, callback, userRole = 'closer') {
+  const title = 'Callback Reminder';
+  const message = `Callback reminder: ${callback.customer_name}`;
+
+  await createNotification(
+    userId,
+    'callback:due',
+    title,
+    message,
+    { callbackId: callback.id, customerName: callback.customer_name, customerPhone: callback.customer_phone },
+    callback.company_id,
+    userRole
+  );
+
+  // Still emit for legacy socket listeners
+  emitToUser(userId, 'callback:due', {
+    message,
+    callback,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export default {
   emitToUser,
   emitToCompany,
-  notifyTransferCreated,
-  notifySaleMade,
-  notifyCallbackDue,
+  notifyTransferCreated: notifyTransferCreatedPersistent,
+  notifySaleMade: notifySaleMadePersistent,
+  notifyCallbackDue: notifyCallbackDuePersistent,
   notifyAdminNewEntity,
   notifyCloserManagerEvent,
   notifyOperationsManagerEvent,
   notifyComplianceManagerEvent,
   notifyComplianceAgentEvent,
+  // New persistent functions
+  createNotification,
+  notifyUserPersistent,
+  notifyRolePersistent,
+  notifyCompanyPersistent,
+  notifyTransferCreatedPersistent,
+  notifySaleMadePersistent,
+  notifyCallbackDuePersistent,
 };

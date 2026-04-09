@@ -5,6 +5,7 @@ import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { createCallbackSchema, updateCallbackSchema } from '../schemas/callback.schema.js';
 import { addCallbackToQueue } from '../services/redis.js';
+import { createNotification } from '../services/notification.js';
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.get('/', async (req, res) => {
 
 // POST /callbacks - Create callback (Fronter, Closer, or Closer Manager)
 router.post('/', roleGuard('fronter', 'closer', 'closer_manager'), validate(createCallbackSchema), async (req, res) => {
-  const { id: userId, companyId } = req.user;
+  const { id: userId, companyId, role } = req.user;
   const { customer_name, customer_phone, best_time, notes } = req.body;
 
   try {
@@ -71,6 +72,23 @@ router.post('/', roleGuard('fronter', 'closer', 'closer_manager'), validate(crea
     // Add to Redis queue for worker to process
     const timestamp = new Date(best_time).getTime() / 1000;
     await addCallbackToQueue(callback.id, timestamp);
+
+    // Create notification for callback scheduled (persistent)
+    const callbackTime = new Date(best_time).toLocaleString();
+    await createNotification(
+      userId,
+      'callback:created',
+      'Callback Scheduled',
+      `Callback reminder scheduled for ${customer_name} at ${callbackTime}`,
+      {
+        callbackId: callback.id,
+        customerName: customer_name,
+        customerPhone: customer_phone,
+        bestTime: best_time,
+      },
+      companyId,
+      role
+    );
 
     res.status(201).json({ callback });
   } catch (err) {
