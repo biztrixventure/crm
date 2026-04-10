@@ -4,9 +4,8 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
-// All routes require authentication and super admin role
+// All routes require authentication
 router.use(authenticate);
-router.use(roleGuard('super_admin', 'readonly_admin'));
 
 function getSafePagination(page, limit) {
   const safePage = Math.max(parseInt(page, 10) || 1, 1);

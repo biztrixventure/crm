@@ -24,7 +24,6 @@ function normalizePhoneLocal(phone) {
 router.get(
   '/number',
   searchLimiter,
-  roleGuard('super_admin', 'company_admin', 'closer', 'closer_manager', 'compliance_manager', 'compliance_agent', 'operations_manager'),
   async (req, res) => {
     const { phone } = req.query;
     const { id: userId, role, companyId } = req.user;

@@ -35,7 +35,6 @@ router.use(authenticate);
 // POST /numbers/upload - Upload CSV/XLSX (Company Admin only)
 router.post(
   '/upload',
-  roleGuard('company_admin', 'super_admin'),
   upload.single('file'),
   async (req, res) => {
     const { companyId, id: userId, role } = req.user;

@@ -286,11 +286,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PATCH /transfers/:id - Edit transfer (Company Admin with allow_edit flag)
+// PATCH /transfers/:id - Edit transfer
 router.patch(
   '/:id',
-  roleGuard('company_admin', 'super_admin'),
-  featureGuard('allow_edit'),
   validate(updateTransferSchema),
   async (req, res) => {
     const { id } = req.params;
@@ -338,11 +336,9 @@ router.patch(
   }
 );
 
-// GET /transfers/export - CSV export (Company Admin with allow_export flag)
+// GET /transfers/export - CSV export
 router.get(
   '/export/csv',
-  roleGuard('company_admin', 'super_admin'),
-  featureGuard('allow_export'),
   async (req, res) => {
     const { role, companyId } = req.user;
     const { from, to, company_id } = req.query;
