@@ -15,9 +15,9 @@ export const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/login', { email, password });
-          
+
           if (response.data.totp_required) {
-            set({ 
+            set({
               intermediateToken: response.data.intermediate_token,
               isLoading: false,
             });
@@ -30,10 +30,36 @@ export const useAuthStore = create(
             intermediateToken: null,
             isLoading: false,
           });
-          
+
+          // ✅ Connect socket after successful login
+          try {
+            const { connectSocket } = await import('../lib/socket.js');
+            setTimeout(() => connectSocket(), 500);
+          } catch (socketErr) {
+            console.warn('Could not connect socket after login:', socketErr);
+          }
+
           return { success: true };
         } catch (error) {
-          const message = error.response?.data?.error || 'Login failed';
+          let message = 'Login failed';
+
+          // ✅ Better error detection for production debugging
+          if (error.response?.status === 504) {
+            message = 'Server unavailable (Gateway Timeout). Ensure API service is running.';
+          } else if (error.response?.status === 401) {
+            message = 'Invalid email or password';
+          } else if (error.response?.status === 400) {
+            message = error.response?.data?.error || 'Invalid request';
+          } else if (error.code === 'ECONNREFUSED') {
+            message = 'Cannot connect to server. Please check your connection.';
+          } else if (error.code === 'ENOTFOUND') {
+            message = 'Cannot reach server. DNS resolution failed.';
+          } else if (error.message?.includes('timeout')) {
+            message = 'Request timeout. Server is slow or unavailable.';
+          } else {
+            message = error.response?.data?.error || error.message || 'Login failed';
+          }
+
           set({ error: message, isLoading: false });
           return { error: message };
         }

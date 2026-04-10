@@ -5,56 +5,89 @@ import { notifyCallbackDuePersistent } from './notification.js';
 let io = null;
 
 export function initSocket(httpServer) {
-  // Determine CORS origin - support multiple formats
-  let corsOrigin = 'http://localhost:5173';
+  // Determine CORS origin for Socket.io
+  // In production, should match FRONTEND_URL environment variable
+  let corsOrigin = process.env.FRONTEND_URL;
 
-  if (process.env.FRONTEND_URL) {
-    corsOrigin = process.env.FRONTEND_URL === '*' ? true : process.env.FRONTEND_URL;
-  } else if (process.env.NODE_ENV === 'production') {
-    // In production without explicit FRONTEND_URL, allow all origins
-    // (relies on socket.io connection with proper credentials)
-    corsOrigin = true;
+  // Fallback logic
+  if (!corsOrigin) {
+    if (process.env.NODE_ENV === 'production') {
+      // Production: default to localhost, but better to have FRONTEND_URL set
+      corsOrigin = true; // Allow all origins (relies on withCredentials=true)
+    } else {
+      corsOrigin = 'http://localhost:5173';
+    }
+  } else if (corsOrigin === '*') {
+    corsOrigin = true; // Socket.io expects true instead of '*'
   }
 
+  // Initialize Socket.io with production settings
   io = new Server(httpServer, {
     cors: {
       origin: corsOrigin,
       credentials: true,
       methods: ['GET', 'POST'],
+      allowedHeaders: ['Content-Type', 'Authorization']
     },
-    allowEIO3: true,
+    // Transport configuration
     transports: ['websocket', 'polling'],
+    allowEIO3: true,
+
+    // Connection settings
     pingInterval: 30000,
     pingTimeout: 60000,
+    upgradeTimeout: 10000,
+
+    // Buffering
+    maxHttpBufferSize: 1e6, // 1MB
+    perMessageDeflate: false, // Disable for better proxy compatibility
+
+    // Parser
+    parser: require('socket.io-parser')
   });
 
-  // Redis adapter setup deferred - works without it for single instance
-  console.log('✅ Socket.io initialized (single instance mode)');
+  console.log('✅ Socket.io initialized', {
+    mode: 'production',
+    transports: ['websocket', 'polling'],
+    corsOrigin,
+    maxHttpBufferSize: '1MB'
+  });
 
+  // Connection handler
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    console.log(`✓ Socket connected: ${socket.id}`);
 
-    // Join user-specific room
+    // Join room event
     socket.on('join', ({ userId, companyId, role }) => {
-      if (userId) {
-        socket.join(`user:${userId}`);
-        console.log(`Socket ${socket.id} joined user:${userId}`);
-      }
-      if (companyId) {
-        socket.join(`company:${companyId}`);
-        console.log(`Socket ${socket.id} joined company:${companyId}`);
-      }
-      if (role) {
-        socket.join(`role:${role}`);
-        console.log(`Socket ${socket.id} joined role:${role}`);
+      try {
+        if (userId) {
+          socket.join(`user:${userId}`);
+          console.log(`  └─ joined: user:${userId}`);
+        }
+        if (companyId) {
+          socket.join(`company:${companyId}`);
+          console.log(`  └─ joined: company:${companyId}`);
+        }
+        if (role) {
+          socket.join(`role:${role}`);
+          console.log(`  └─ joined: role:${role}`);
+        }
+      } catch (err) {
+        console.error('Error joining rooms:', err);
       }
     });
 
+    // Disconnect handler
     socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      console.log(`✗ Socket disconnected: ${socket.id}`);
     });
 
-    // Worker emits this event when callback time is due
+    // Error handler
+    socket.on('error', (error) => {
+      console.error(`Socket error (${socket.id}):`, error);
+    });
+
+    // Worker callback notification
     socket.on('callback:fire', async ({ userId, callback }) => {
       if (!userId || !callback) return;
       try {
@@ -63,6 +96,11 @@ export function initSocket(httpServer) {
         console.error('Error handling callback:fire event:', err);
       }
     });
+  });
+
+  // Global error handler
+  io.on('error', (error) => {
+    console.error('Socket.io error:', error);
   });
 
   return io;
@@ -75,20 +113,33 @@ export function getIO() {
   return io;
 }
 
-// Notification helpers
+// ===== Notification Helpers =====
+
 export function notifyUser(userId, event, data) {
   if (!io) return;
-  io.to(`user:${userId}`).emit(event, data);
+  try {
+    io.to(`user:${userId}`).emit(event, data);
+  } catch (err) {
+    console.error(`Error notifying user ${userId}:`, err);
+  }
 }
 
 export function notifyCompany(companyId, event, data) {
   if (!io) return;
-  io.to(`company:${companyId}`).emit(event, data);
+  try {
+    io.to(`company:${companyId}`).emit(event, data);
+  } catch (err) {
+    console.error(`Error notifying company ${companyId}:`, err);
+  }
 }
 
 export function notifyRole(role, event, data) {
   if (!io) return;
-  io.to(`role:${role}`).emit(event, data);
+  try {
+    io.to(`role:${role}`).emit(event, data);
+  } catch (err) {
+    console.error(`Error notifying role ${role}:`, err);
+  }
 }
 
 export function notifyTransferToCloser(closerId, transfer) {
