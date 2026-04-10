@@ -17,9 +17,7 @@ export default function Login() {
 
     const result = await login(email, password);
 
-    if (result.totpRequired) {
-      navigate('/totp-verify');
-    } else if (result.success) {
+    if (result.success) {
       navigate('/');
     }
   };

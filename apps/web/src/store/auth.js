@@ -7,7 +7,6 @@ export const useAuthStore = create(
     (set, get) => ({
       user: null,
       token: null,
-      intermediateToken: null,
       isLoading: false,
       error: null,
 
@@ -16,34 +15,16 @@ export const useAuthStore = create(
         try {
           const response = await api.post('/auth/login', { email, password });
 
-          if (response.data.totp_required) {
-            set({
-              intermediateToken: response.data.intermediate_token,
-              isLoading: false,
-            });
-            return { totpRequired: true };
-          }
-
           set({
             user: response.data.user,
             token: response.data.token,
-            intermediateToken: null,
             isLoading: false,
           });
-
-          // ✅ Connect socket after successful login
-          try {
-            const { connectSocket } = await import('../lib/socket.js');
-            setTimeout(() => connectSocket(), 500);
-          } catch (socketErr) {
-            console.warn('Could not connect socket after login:', socketErr);
-          }
 
           return { success: true };
         } catch (error) {
           let message = 'Login failed';
 
-          // ✅ Better error detection for production debugging
           if (error.response?.status === 504) {
             message = 'Server unavailable (Gateway Timeout). Ensure API service is running.';
           } else if (error.response?.status === 401) {
@@ -65,47 +46,13 @@ export const useAuthStore = create(
         }
       },
 
-      verifyTotp: async (code) => {
-        const { intermediateToken } = get();
-        set({ isLoading: true, error: null });
-
-        try {
-          const response = await api.post(
-            '/auth/totp/verify',
-            { token: code },
-            { headers: { Authorization: `Bearer ${intermediateToken}` } }
-          );
-
-          set({
-            user: response.data.user,
-            token: response.data.token,
-            intermediateToken: null,
-            isLoading: false,
-          });
-
-          // ✅ Connect socket after successful TOTP verification (same as regular login)
-          try {
-            const { connectSocket } = await import('../lib/socket.js');
-            setTimeout(() => connectSocket(), 500);
-          } catch (socketErr) {
-            console.warn('Could not connect socket after TOTP verification:', socketErr);
-          }
-
-          return { success: true };
-        } catch (error) {
-          const message = error.response?.data?.error || 'Verification failed';
-          set({ error: message, isLoading: false });
-          return { error: message };
-        }
-      },
-
       logout: async () => {
         try {
           await api.post('/auth/logout');
         } catch (error) {
           console.error('Logout error:', error);
         }
-        set({ user: null, token: null, intermediateToken: null });
+        set({ user: null, token: null });
       },
 
       checkAuth: async () => {
