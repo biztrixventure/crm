@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { createDispositionSchema, updateDispositionSchema } from '../schemas/disposition.schema.js';
 
@@ -30,7 +29,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /dispositions - Create disposition (Super Admin only)
-router.post('/', roleGuard('super_admin'), validate(createDispositionSchema), async (req, res) => {
+router.post('/', validate(createDispositionSchema), async (req, res) => {
   const { label, is_default } = req.body;
   const { id: userId } = req.user;
 
@@ -66,7 +65,7 @@ router.post('/', roleGuard('super_admin'), validate(createDispositionSchema), as
 });
 
 // PATCH /dispositions/:id - Update disposition (Super Admin only)
-router.patch('/:id', roleGuard('super_admin'), validate(updateDispositionSchema), async (req, res) => {
+router.patch('/:id', validate(updateDispositionSchema), async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
 

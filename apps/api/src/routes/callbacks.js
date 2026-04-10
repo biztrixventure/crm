@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { createCallbackSchema, updateCallbackSchema } from '../schemas/callback.schema.js';
 import { addCallbackToQueue } from '../services/redis.js';
@@ -49,7 +48,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /callbacks - Create callback (Fronter, Closer, or Closer Manager)
-router.post('/', roleGuard('fronter', 'closer', 'closer_manager'), validate(createCallbackSchema), async (req, res) => {
+router.post('/', validate(createCallbackSchema), async (req, res) => {
   const { id: userId, companyId, role } = req.user;
   const { customer_name, customer_phone, best_time, notes } = req.body;
 

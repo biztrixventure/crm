@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import z from 'zod';
 
@@ -35,7 +34,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /plans - Create plan (Super Admin only)
-router.post('/', roleGuard('super_admin'), validate(planSchema), async (req, res) => {
+router.post('/', validate(planSchema), async (req, res) => {
   const { name } = req.body;
 
   try {
@@ -60,7 +59,7 @@ router.post('/', roleGuard('super_admin'), validate(planSchema), async (req, res
 });
 
 // PATCH /plans/:id - Update or deactivate plan (Super Admin only)
-router.patch('/:id', roleGuard('super_admin'), async (req, res) => {
+router.patch('/:id', async (req, res) => {
   const { id } = req.params;
   const { name, is_active } = req.body;
 

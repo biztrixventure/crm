@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 
 const router = Router();
 

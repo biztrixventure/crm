@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { searchLimiter } from '../middleware/rateLimit.js';
 import { normalizePhoneE164 } from '../lib/phoneUtil.js';
 

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { createUserSchema, updateUserSchema } from '../schemas/user.schema.js';
 import { notifyAdminNewEntity } from '../services/notification.js';

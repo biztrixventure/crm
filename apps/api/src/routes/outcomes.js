@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createOutcomeSchema, outcomeQuerySchema } from '../schemas/outcome.schema.js';
 import { notifySaleMadePersistent } from '../services/notification.js';
@@ -103,7 +102,7 @@ router.get('/', validateQuery(outcomeQuerySchema), async (req, res) => {
 });
 
 // POST /outcomes - Create outcome (Closer and Closer Manager)
-router.post('/', roleGuard('closer', 'closer_manager'), validate(createOutcomeSchema), async (req, res) => {
+router.post('/', validate(createOutcomeSchema), async (req, res) => {
   const { id: closerId } = req.user;
   const { transfer_id, company_id, customer_phone, customer_name, disposition_id, remarks } = req.body;
 
@@ -222,7 +221,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /outcomes/:id/new-policy - Create new policy linked to existing outcome
-router.post('/:id/new-policy', roleGuard('closer'), validate(createOutcomeSchema), async (req, res) => {
+router.post('/:id/new-policy', validate(createOutcomeSchema), async (req, res) => {
   const { id: existingOutcomeId } = req.params;
   const { id: closerId } = req.user;
   const { transfer_id, company_id, customer_phone, customer_name, disposition_id, remarks } = req.body;

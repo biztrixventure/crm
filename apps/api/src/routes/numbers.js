@@ -3,7 +3,6 @@ import multer from 'multer';
 import XLSX from 'xlsx';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard } from '../middleware/role.js';
 import { validate } from '../middleware/validate.js';
 import { assignNumbersSchema } from '../schemas/number.schema.js';
 import { logAuditEvent } from '../services/audit.js';
@@ -124,7 +123,7 @@ router.post(
 );
 
 // GET /numbers/lists - Get all number lists for company
-router.get('/lists', roleGuard('company_admin', 'super_admin'), async (req, res) => {
+router.get('/lists', async (req, res) => {
   const { companyId, role } = req.user;
   const { company_id } = req.query;
 
@@ -172,7 +171,7 @@ router.get('/lists', roleGuard('company_admin', 'super_admin'), async (req, res)
 });
 
 // GET /numbers/lists/:id - Get numbers from a specific list
-router.get('/lists/:id', roleGuard('company_admin', 'super_admin'), async (req, res) => {
+router.get('/lists/:id', async (req, res) => {
   const { id } = req.params;
   const { companyId, role } = req.user;
   const { fronter_id, assigned, page = 1, limit = 50 } = req.query;
@@ -236,7 +235,7 @@ router.get('/lists/:id', roleGuard('company_admin', 'super_admin'), async (req, 
 });
 
 // POST /numbers/assign - Assign numbers to fronter
-router.post('/assign', roleGuard('company_admin', 'super_admin'), validate(assignNumbersSchema), async (req, res) => {
+router.post('/assign', validate(assignNumbersSchema), async (req, res) => {
   const { list_id, fronter_id, from_row, to_row } = req.body;
   const { companyId, role, id: userId } = req.user;
 
@@ -312,7 +311,7 @@ router.post('/assign', roleGuard('company_admin', 'super_admin'), validate(assig
 });
 
 // GET /numbers/my - Get numbers assigned to current fronter
-router.get('/my', roleGuard('fronter'), async (req, res) => {
+router.get('/my', async (req, res) => {
   const { id: userId } = req.user;
   const { page = 1, limit = 50 } = req.query;
 

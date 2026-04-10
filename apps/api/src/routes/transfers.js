@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { format } from 'fast-csv';
 import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
-import { roleGuard, featureGuard } from '../middleware/role.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createTransferSchema, updateTransferSchema, transferQuerySchema } from '../schemas/transfer.schema.js';
 import { notifyTransferCreatedPersistent, createNotification, emitToUser } from '../services/notification.js';
@@ -102,7 +101,7 @@ router.get('/', validateQuery(transferQuerySchema), async (req, res) => {
 });
 
 // POST /transfers - Create transfer (Fronter only)
-router.post('/', roleGuard('fronter'), validate(createTransferSchema), async (req, res) => {
+router.post('/', validate(createTransferSchema), async (req, res) => {
   const { id: fronterId, companyId } = req.user;
   const transferData = req.body;
 
