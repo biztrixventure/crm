@@ -68,7 +68,7 @@ export const useAuthStore = create(
       verifyTotp: async (code) => {
         const { intermediateToken } = get();
         set({ isLoading: true, error: null });
-        
+
         try {
           const response = await api.post(
             '/auth/totp/verify',
@@ -82,6 +82,14 @@ export const useAuthStore = create(
             intermediateToken: null,
             isLoading: false,
           });
+
+          // ✅ Connect socket after successful TOTP verification (same as regular login)
+          try {
+            const { connectSocket } = await import('../lib/socket.js');
+            setTimeout(() => connectSocket(), 500);
+          } catch (socketErr) {
+            console.warn('Could not connect socket after TOTP verification:', socketErr);
+          }
 
           return { success: true };
         } catch (error) {
