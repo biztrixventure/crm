@@ -4,7 +4,7 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createTransferSchema, updateTransferSchema, transferQuerySchema } from '../schemas/transfer.schema.js';
-import { notifyTransferCreatedPersistent, createNotification, emitToUser } from '../services/notification.js';
+import { createNotification } from '../services/notification.js';
 
 const router = Router();
 
@@ -149,13 +149,14 @@ router.post('/', validate(createTransferSchema), async (req, res) => {
     if (error) throw error;
 
     // Notify closer about new transfer (persistent)
-    await notifyTransferCreatedPersistent(
-      transferData.closer_id,
-      transfer,
-      company?.display_name || 'Unknown',
-      companyId,
-      'closer'
-    );
+    // REMOVED: notifyTransferCreatedPersistent - socket.io no longer exists
+    // await notifyTransferCreatedPersistent(
+    //   transferData.closer_id,
+    //   transfer,
+    //   company?.display_name || 'Unknown',
+    //   companyId,
+    //   'closer'
+    // );
 
     // Notify the closer's manager (if they have one)
     if (closer.manager_id) {
@@ -177,20 +178,20 @@ router.post('/', validate(createTransferSchema), async (req, res) => {
           'closer_manager'
         );
 
-        // Emit socket event to manager
-        emitToUser(closer.manager_id, 'transfer:assigned', {
-          id: transfer.id,
-          type: 'transfer:assigned',
-          title: 'Transfer Assigned',
-          message: `Transfer assigned to ${closer.full_name}`,
-          is_read: false,
-          created_at: new Date().toISOString(),
-          metadata: {
-            transferId: transfer.id,
-            closerId: closer.id,
-            closerName: closer.full_name
-          }
-        });
+        // REMOVED: emitToUser for real-time notification - socket.io no longer exists
+        // emitToUser(closer.manager_id, 'transfer:assigned', {
+        //   id: transfer.id,
+        //   type: 'transfer:assigned',
+        //   title: 'Transfer Assigned',
+        //   message: `Transfer assigned to ${closer.full_name}`,
+        //   is_read: false,
+        //   created_at: new Date().toISOString(),
+        //   metadata: {
+        //     transferId: transfer.id,
+        //     closerId: closer.id,
+        //     closerName: closer.full_name
+        //   }
+        // });
       } catch (err) {
         console.error('Failed to notify manager:', err);
       }
@@ -215,20 +216,20 @@ router.post('/', validate(createTransferSchema), async (req, res) => {
         'fronter'
       );
 
-      // Emit socket event to fronter
-      emitToUser(fronterId, 'transfer:created', {
-        id: transfer.id,
-        type: 'transfer:created',
-        title: 'Transfer Submitted',
-        message: `Transfer to ${closer.full_name} has been submitted`,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        metadata: {
-          transferId: transfer.id,
-          closerId: closer.id,
-          closerName: closer.full_name
-        }
-      });
+      // REMOVED: emitToUser for real-time notification - socket.io no longer exists
+      // emitToUser(fronterId, 'transfer:created', {
+      //   id: transfer.id,
+      //   type: 'transfer:created',
+      //   title: 'Transfer Submitted',
+      //   message: `Transfer to ${closer.full_name} has been submitted`,
+      //   is_read: false,
+      //   created_at: new Date().toISOString(),
+      //   metadata: {
+      //     transferId: transfer.id,
+      //     closerId: closer.id,
+      //     closerName: closer.full_name
+      //   }
+      // });
     } catch (err) {
       console.error('Failed to notify fronter:', err);
     }

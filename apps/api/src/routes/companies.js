@@ -3,7 +3,6 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createCompanySchema, updateCompanySchema } from '../schemas/company.schema.js';
-import { notifyAdminNewEntity } from '../services/notification.js';
 
 const router = Router();
 
@@ -116,8 +115,8 @@ router.post('/', validate(createCompanySchema), async (req, res) => {
 
     if (error) throw error;
 
-    // Notify other super admins
-    notifyAdminNewEntity('company', company);
+    // REMOVED: notifyAdminNewEntity - socket.io no longer exists
+    // notifyAdminNewEntity('company', company);
 
     res.status(201).json({ company });
   } catch (err) {

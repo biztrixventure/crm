@@ -3,7 +3,6 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createUserSchema, updateUserSchema } from '../schemas/user.schema.js';
-import { notifyAdminNewEntity } from '../services/notification.js';
 
 const router = Router();
 
@@ -206,7 +205,8 @@ router.post('/', validate(createUserSchema), async (req, res) => {
 
     // Notify super admins about new user
     if (creatorRole === 'super_admin') {
-      notifyAdminNewEntity('user', user);
+      // REMOVED: notifyAdminNewEntity - socket.io no longer exists
+      // notifyAdminNewEntity('user', user);
     }
 
     res.status(201).json({ user });

@@ -1,130 +1,21 @@
-import { getIO, notifyRole } from './socket.js';
 import supabase from './supabase.js';
 
-export function emitToUser(userId, event, data) {
-  const io = getIO();
-  io.to(`user:${userId}`).emit(event, data);
-}
-
-export function emitToCompany(companyId, event, data) {
-  const io = getIO();
-  io.to(`company:${companyId}`).emit(event, data);
-}
-
-// Transfer submitted - notify the selected closer
-export function notifyTransferCreated(closerId, transfer, companyName) {
-  emitToUser(closerId, 'transfer:new', {
-    message: `New transfer incoming from ${companyName}`,
-    transfer,
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// Sale made - notify company admin
-export function notifySaleMade(companyId, outcome, closerName) {
-  emitToCompany(companyId, 'sale:made', {
-    message: `Sale recorded by ${closerName} for your lead`,
-    outcome,
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// Callback due - notify the user who created it
-export function notifyCallbackDue(userId, callback) {
-  emitToUser(userId, 'callback:due', {
-    message: `Callback reminder: ${callback.customer_name}`,
-    callback,
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// New company/user created - notify super admin
-export function notifyAdminNewEntity(entityType, entity) {
-  // Notify only admin roles
-  const payload = {
-    message: `New ${entityType} created: ${entity.name || entity.full_name}`,
-    entityType,
-    entity,
-    timestamp: new Date().toISOString(),
-  };
-
-  notifyRole('super_admin', 'admin:new_entity', payload);
-  notifyRole('readonly_admin', 'admin:new_entity', payload);
-}
-
-// Closer Manager events
-export function notifyCloserManagerEvent({ eventType, message, userId, closerId, batchId }) {
-  const payload = {
-    eventType,
-    message,
-    closerId,
-    batchId,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Notify all closer manager instances
-  const io = getIO();
-  io.to('role:closer_manager').emit('closer_manager:event', payload);
-
-  // Also notify specific user if provided
-  if (userId) {
-    emitToUser(userId, 'closer_manager:event', payload);
-  }
-}
-
-// Operations Manager events
-export function notifyOperationsManagerEvent({ eventType, message }) {
-  const payload = {
-    eventType,
-    message,
-    timestamp: new Date().toISOString(),
-  };
-
-  const io = getIO();
-  io.to('role:operations_manager').emit('operations_manager:event', payload);
-}
-
-// Compliance Manager events
-export function notifyComplianceManagerEvent({ eventType, message, userId, batchId, recordId }) {
-  const payload = {
-    eventType,
-    message,
-    batchId,
-    recordId,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Notify all compliance manager instances
-  const io = getIO();
-  io.to('role:compliance_manager').emit('compliance_manager:event', payload);
-
-  // Also notify specific manager
-  if (userId) {
-    emitToUser(userId, 'compliance_manager:event', payload);
-  }
-}
-
-// Compliance Agent events
-export function notifyComplianceAgentEvent({ eventType, message, userId, batchId }) {
-  const payload = {
-    eventType,
-    message,
-    batchId,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Notify specific agent
-  if (userId) {
-    emitToUser(userId, 'compliance_agent:event', payload);
-    const io = getIO();
-    io.to(`compliance_agent:${userId}`).emit('compliance_agent:event', payload);
-  }
-}
+// REMOVED: Socket.io functions (socket.js no longer exists)
+// - emitToUser
+// - emitToCompany
+// - notifyTransferCreated
+// - notifySaleMade
+// - notifyCallbackDue
+// - notifyAdminNewEntity
+// - notifyCloserManagerEvent
+// - notifyOperationsManagerEvent
+// - notifyComplianceManagerEvent
+// - notifyComplianceAgentEvent
 
 // ===== Persistent Notification Functions =====
 
 /**
- * Create persistent notification in database and emit socket event
+ * Create persistent notification in database
  * @param {string} userId - User to notify
  * @param {string} type - Notification type (transfer:new, callback:due, etc)
  * @param {string} title - Display title
@@ -152,17 +43,8 @@ export async function createNotification(userId, type, title, message, metadata 
 
     if (error) throw error;
 
-    // Emit socket event for real-time delivery
-    emitToUser(userId, 'notification:new', {
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      is_read: notification.is_read,
-      created_at: notification.created_at,
-      timestamp: notification.created_at,
-      metadata: notification.metadata,
-    });
+    // NOTE: Socket.io real-time delivery removed (socket.js no longer exists)
+    // Notifications are persisted in database and can be fetched via API
 
     return notification;
   } catch (err) {
@@ -231,111 +113,15 @@ export async function notifyCompanyPersistent(companyId, type, title, message, m
   }
 }
 
-// ===== Enhanced Event Notification Functions =====
-
-// Transfer submitted - notify the selected closer (PERSISTENT)
-export async function notifyTransferCreatedPersistent(closerId, transfer, companyName, companyId, closer_role = 'closer') {
-  const title = 'New Transfer';
-  const message = `New transfer incoming from ${companyName}`;
-
-  await createNotification(
-    closerId,
-    'transfer:new',
-    title,
-    message,
-    { 
-      transferId: transfer.id, 
-      customerName: transfer.customer_name, 
-      customerPhone: transfer.customer_phone,
-      companyName,
-      fronterId: transfer.fronter_id,
-      fronterName: transfer.fronter?.full_name
-    },
-    companyId,
-    closer_role
-  );
-
-  // Emit for real-time delivery to closer
-  emitToUser(closerId, 'transfer:new', {
-    id: transfer.id,
-    type: 'transfer:new',
-    title: title,
-    message,
-    is_read: false,
-    created_at: new Date().toISOString(),
-    timestamp: new Date().toISOString(),
-    metadata: {
-      transferId: transfer.id,
-      customerName: transfer.customer_name,
-      customerPhone: transfer.customer_phone,
-      companyName,
-      fronterId: transfer.fronter_id
-    }
-  });
-}
-
-// Sale made - notify company admin (PERSISTENT)
-export async function notifySaleMadePersistent(companyId, outcome, closerName, dispositions) {
-  const title = 'Sale Recorded';
-  const message = `Sale recorded by ${closerName} for your lead`;
-
-  // Notify company admins
-  await notifyCompanyPersistent(
-    companyId,
-    'sale:made',
-    title,
-    message,
-    { outcomeId: outcome.id, closerId: outcome.closer_id, disposition: dispositions ? dispositions.label : 'Sale Made' }
-  );
-
-  // Still emit for legacy socket listeners
-  emitToCompany(companyId, 'sale:made', {
-    message,
-    outcome,
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// Callback due - notify the user who created it (PERSISTENT)
-export async function notifyCallbackDuePersistent(userId, callback, userRole = 'closer') {
-  const title = 'Callback Reminder';
-  const message = `Callback reminder: ${callback.customer_name}`;
-
-  await createNotification(
-    userId,
-    'callback:due',
-    title,
-    message,
-    { callbackId: callback.id, customerName: callback.customer_name, customerPhone: callback.customer_phone },
-    callback.company_id,
-    userRole
-  );
-
-  // Still emit for legacy socket listeners
-  emitToUser(userId, 'callback:due', {
-    message,
-    callback,
-    timestamp: new Date().toISOString(),
-  });
-}
+// REMOVED: Enhanced Event Notification Functions (socket.io dependent)
+// - notifyTransferCreatedPersistent
+// - notifySaleMadePersistent
+// - notifyCallbackDuePersistent
 
 export default {
-  emitToUser,
-  emitToCompany,
-  notifyTransferCreated: notifyTransferCreatedPersistent,
-  notifySaleMade: notifySaleMadePersistent,
-  notifyCallbackDue: notifyCallbackDuePersistent,
-  notifyAdminNewEntity,
-  notifyCloserManagerEvent,
-  notifyOperationsManagerEvent,
-  notifyComplianceManagerEvent,
-  notifyComplianceAgentEvent,
-  // New persistent functions
+  // Persistent database functions (socket.io removed)
   createNotification,
   notifyUserPersistent,
   notifyRolePersistent,
   notifyCompanyPersistent,
-  notifyTransferCreatedPersistent,
-  notifySaleMadePersistent,
-  notifyCallbackDuePersistent,
 };

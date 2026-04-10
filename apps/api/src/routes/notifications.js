@@ -3,7 +3,6 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
-import { emitToUser } from '../services/notification.js';
 
 const router = Router();
 
@@ -123,11 +122,11 @@ router.patch('/:id/read', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Emit socket event for real-time sync
-    emitToUser(userId, 'notification:read', {
-      notificationId: id,
-      timestamp: new Date().toISOString(),
-    });
+    // REMOVED: emitToUser for real-time sync - socket.io no longer exists
+    // emitToUser(userId, 'notification:read', {
+    //   notificationId: id,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     res.json({ notification: updated });
   } catch (err) {
@@ -151,11 +150,11 @@ router.patch('/read-all', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Emit socket event for real-time sync
-    emitToUser(userId, 'notifications:read-all', {
-      count: updated?.length || 0,
-      timestamp: new Date().toISOString(),
-    });
+    // REMOVED: emitToUser for real-time sync - socket.io no longer exists
+    // emitToUser(userId, 'notifications:read-all', {
+    //   count: updated?.length || 0,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     res.json({
       message: 'All notifications marked as read',
@@ -196,11 +195,11 @@ router.delete('/:id', async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // Emit socket event for real-time sync
-    emitToUser(userId, 'notification:deleted', {
-      notificationId: id,
-      timestamp: new Date().toISOString(),
-    });
+    // REMOVED: emitToUser for real-time sync - socket.io no longer exists
+    // emitToUser(userId, 'notification:deleted', {
+    //   notificationId: id,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     res.json({ message: 'Notification deleted' });
   } catch (err) {
@@ -255,17 +254,17 @@ router.post('/test', async (req, res) => {
 
     if (error) throw error;
 
-    // Emit socket event with full notification data
-    emitToUser(userId, 'notification:new', {
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      is_read: notification.is_read,
-      created_at: notification.created_at,
-      timestamp: notification.created_at,
-      metadata: notification.metadata,
-    });
+    // REMOVED: emitToUser for real-time delivery - socket.io no longer exists
+    // emitToUser(userId, 'notification:new', {
+    //   id: notification.id,
+    //   type: notification.type,
+    //   title: notification.title,
+    //   message: notification.message,
+    //   is_read: notification.is_read,
+    //   created_at: notification.created_at,
+    //   timestamp: notification.created_at,
+    //   metadata: notification.metadata,
+    // });
 
     res.status(201).json({
       message: 'Test notification created',

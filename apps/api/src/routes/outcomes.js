@@ -3,7 +3,6 @@ import supabase from '../services/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { createOutcomeSchema, outcomeQuerySchema } from '../schemas/outcome.schema.js';
-import { notifySaleMadePersistent } from '../services/notification.js';
 import { markNumberSold } from '../services/redis.js';
 
 const router = Router();
@@ -155,18 +154,17 @@ router.post('/', validate(createOutcomeSchema), async (req, res) => {
 
     if (error) throw error;
 
-    // If Sale Made, mark number as sold in Redis and notify company
+    // If Sale Made, mark number as sold in Redis
     if (disposition.label === 'Sale Made') {
       await markNumberSold(normalizedPhone, true);
 
-      // Get closer name for notification
-      const { data: closer } = await supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', closerId)
-        .single();
-
-      await notifySaleMadePersistent(company_id, outcome, closer?.full_name || 'Unknown', disposition);
+      // REMOVED: notifySaleMadePersistent - socket.io no longer exists
+      // const { data: closer } = await supabase
+      //   .from('users')
+      //   .select('full_name')
+      //   .eq('id', closerId)
+      //   .single();
+      // await notifySaleMadePersistent(company_id, outcome, closer?.full_name || 'Unknown', disposition);
     }
 
     res.status(201).json({ outcome });
@@ -290,14 +288,14 @@ router.post('/:id/new-policy', validate(createOutcomeSchema), async (req, res) =
     // If Sale Made, mark number as sold and notify
     if (disposition.label === 'Sale Made') {
       await markNumberSold(normalizedPhone, true);
-      
-      const { data: closer } = await supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', closerId)
-        .single();
 
-      notifySaleMade(company_id, newOutcome, closer?.full_name || 'Unknown');
+      // REMOVED: notifySaleMade - socket.io no longer exists
+      // const { data: closer } = await supabase
+      //   .from('users')
+      //   .select('full_name')
+      //   .eq('id', closerId)
+      //   .single();
+      // notifySaleMade(company_id, newOutcome, closer?.full_name || 'Unknown');
     }
 
     res.status(201).json({ outcome: newOutcome, linkedTo: existingOutcomeId });
