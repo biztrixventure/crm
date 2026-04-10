@@ -28,11 +28,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const authStore = useAuthStore.getState();
-      // Don't logout if it's a TOTP-related response
-      if (!error.response?.data?.totp_required) {
-        authStore.logout();
-        window.location.href = '/login';
-      }
+      authStore.logout();
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

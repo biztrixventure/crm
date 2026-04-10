@@ -40,7 +40,6 @@ export async function authenticate(req, res, next) {
         full_name,
         role,
         company_id,
-        totp_enabled,
         is_active,
         companies!users_company_id_fkey (
           id,
@@ -68,7 +67,6 @@ export async function authenticate(req, res, next) {
       fullName: user.full_name,
       role: user.role,
       companyId: user.company_id,
-      totpEnabled: user.totp_enabled,
       company: user.companies,
       featureFlags: user.companies?.feature_flags || {},
     };
