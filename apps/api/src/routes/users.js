@@ -332,16 +332,13 @@ router.patch('/me/profile', async (req, res) => {
   }
 });
 
-// GET /users/closers/list - List active closers (for transfer form dropdown)
+// GET /users/closers/list - List all active closers globally (for transfer form dropdown)
 router.get('/closers/list', authenticate, async (req, res) => {
-  const { companyId } = req.user;
-
   try {
     const { data: closers, error } = await supabase
       .from('users')
       .select('id, full_name, email')
       .eq('role', 'closer')
-      .eq('company_id', companyId)
       .eq('is_active', true)
       .order('full_name');
 
