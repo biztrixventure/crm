@@ -39,9 +39,7 @@ const routeFiles = [
   'numbers.js',
   'audit.js',
   'search.js',
-  'closer-manager.js',
-  'operations.js',
-  'compliance.js',
+  'notifications.js',
 ];
 
 const routesDir = path.join(__dirname, 'routes');
@@ -56,7 +54,7 @@ if (missingRoutes.length > 0) {
 
 // 3. Check services exist
 console.log('✓ Checking service files...');
-const serviceFiles = ['supabase.js', 'socket.js', 'redis.js', 'notification.js', 'audit.js'];
+const serviceFiles = ['supabase.js', 'redis.js', 'notification.js', 'audit.js'];
 const servicesDir = path.join(__dirname, 'services');
 const missingServices = serviceFiles.filter(file => {
   const filePath = path.join(servicesDir, file);
@@ -71,7 +69,7 @@ if (missingServices.length > 0) {
 
 // 4. Check middleware exists
 console.log('✓ Checking middleware files...');
-const middlewareFiles = ['auth.js', 'role.js', 'validate.js'];
+const middlewareFiles = ['auth.js', 'validate.js'];
 const middlewareDir = path.join(__dirname, 'middleware');
 const missingMiddleware = middlewareFiles.filter(file => !fs.existsSync(path.join(middlewareDir, file)));
 

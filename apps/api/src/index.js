@@ -5,7 +5,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { createServer } from 'http';
-import { initSocket } from './services/socket.js';
 import { initRedis } from './services/redis.js';
 import { CONFIG } from './lib/config.js';
 
@@ -45,9 +44,6 @@ import callbackRoutes from './routes/callbacks.js';
 import numberRoutes from './routes/numbers.js';
 import auditRoutes from './routes/audit.js';
 import searchRoutes from './routes/search.js';
-import closerManagerRoutes from './routes/closer-manager.js';
-import operationsRoutes from './routes/operations.js';
-import complianceRoutes from './routes/compliance.js';
 import notificationRoutes from './routes/notifications.js';
 
 const app = express();
@@ -55,9 +51,6 @@ const httpServer = createServer(app);
 
 // Trust proxy - required for rate limiting behind reverse proxy (Coolify/Traefik)
 app.set('trust proxy', 1);
-
-// Initialize Socket.io
-initSocket(httpServer);
 
 // Initialize Redis
 initRedis();
@@ -120,9 +113,6 @@ app.use('/api/v1/callbacks', callbackRoutes);
 app.use('/api/v1/numbers', numberRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/search', searchRoutes);
-app.use('/api/v1/closer-manager', closerManagerRoutes);
-app.use('/api/v1/operations', operationsRoutes);
-app.use('/api/v1/compliance', complianceRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 
 // 404 handler
@@ -161,7 +151,7 @@ process.on('uncaughtException', (err) => {
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ BizTrixVenture API running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Routes registered: Auth, Companies, Users, Transfers, Outcomes, Dispositions, Plans, Clients, Callbacks, Numbers, Audit, Search, CloserManager, Operations, Compliance`);
+  console.log(`🔗 Routes registered: Auth, Companies, Users, Transfers, Outcomes, Dispositions, Plans, Clients, Callbacks, Numbers, Audit, Search, Notifications`);
 }).on('error', (err) => {
   console.error('❌ Server startup error:', err);
   process.exit(1);
