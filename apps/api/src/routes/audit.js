@@ -98,7 +98,6 @@ router.get('/events', async (req, res) => {
         'login_failed',
         'logout',
         '2fa_setup',
-        'totp_verify_failed',
         'password_reset',
         'number_assignment',
       ],

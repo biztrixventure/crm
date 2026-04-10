@@ -34,7 +34,6 @@ router.get('/', async (req, res) => {
         company_id,
         managed_by,
         is_active,
-        totp_enabled,
         created_at
       `)
       .order('created_at', { ascending: false })
@@ -231,7 +230,6 @@ router.get('/me/profile', async (req, res) => {
         role,
         company_id,
         is_active,
-        totp_enabled,
         created_at,
         last_login,
         companies!users_company_id_fkey (
@@ -312,7 +310,6 @@ router.patch('/me/profile', async (req, res) => {
         role,
         company_id,
         is_active,
-        totp_enabled,
         created_at,
         companies!users_company_id_fkey (
           id,
@@ -366,7 +363,6 @@ router.get('/:id', async (req, res) => {
         company_id,
         managed_by,
         is_active,
-        totp_enabled,
         created_by,
         created_at,
         companies!users_company_id_fkey (
@@ -454,7 +450,6 @@ router.patch('/:id', validate(updateUserSchema), async (req, res) => {
         company_id,
         managed_by,
         is_active,
-        totp_enabled,
         created_by,
         created_at,
         companies!users_company_id_fkey (
@@ -492,7 +487,6 @@ router.get('/:id/profile', async (req, res) => {
           role,
           company_id,
           is_active,
-          totp_enabled,
           created_at,
           last_login,
           companies!users_company_id_fkey (
@@ -530,7 +524,6 @@ router.get('/:id/profile', async (req, res) => {
         role,
         company_id,
         is_active,
-        totp_enabled,
         created_at,
         last_login,
         companies!users_company_id_fkey (

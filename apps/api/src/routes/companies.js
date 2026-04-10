@@ -360,7 +360,6 @@ router.get('/:id/users', async (req, res) => {
         full_name,
         role,
         is_active,
-        totp_enabled,
         created_at,
         last_login
       `)
@@ -529,14 +528,13 @@ router.get('/:id/export', async (req, res) => {
 
       if (error) throw error;
 
-      headers = ['ID', 'Email', 'Full Name', 'Role', 'Active', '2FA Enabled', 'Created At'];
+      headers = ['ID', 'Email', 'Full Name', 'Role', 'Active', 'Created At'];
       data = users.map(u => [
         u.id,
         u.email,
         u.full_name,
         u.role,
         u.is_active ? 'Yes' : 'No',
-        u.totp_enabled ? 'Yes' : 'No',
         new Date(u.created_at).toISOString()
       ]);
     }
