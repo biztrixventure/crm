@@ -333,12 +333,15 @@ router.patch('/me/profile', async (req, res) => {
 });
 
 // GET /users/closers/list - List active closers (for transfer form dropdown)
-router.get('/closers/list', async (req, res) => {
+router.get('/closers/list', authenticate, async (req, res) => {
+  const { companyId } = req.user;
+
   try {
     const { data: closers, error } = await supabase
       .from('users')
       .select('id, full_name, email')
       .eq('role', 'closer')
+      .eq('company_id', companyId)
       .eq('is_active', true)
       .order('full_name');
 
@@ -472,25 +475,6 @@ router.patch('/:id', validate(updateUserSchema), async (req, res) => {
   } catch (err) {
     console.error('Update user error:', err);
     res.status(500).json({ error: 'Failed to update user' });
-  }
-});
-
-// GET /users/closers - List active closers (for transfer form dropdown)
-router.get('/closers/list', async (req, res) => {
-  try {
-    const { data: closers, error } = await supabase
-      .from('users')
-      .select('id, full_name, email')
-      .eq('role', 'closer')
-      .eq('is_active', true)
-      .order('full_name');
-
-    if (error) throw error;
-
-    res.json({ closers });
-  } catch (err) {
-    console.error('Get closers error:', err);
-    res.status(500).json({ error: 'Failed to fetch closers' });
   }
 });
 
