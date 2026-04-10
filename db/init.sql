@@ -29,10 +29,8 @@ CREATE TABLE users (
   id           uuid PRIMARY KEY,
   email        text UNIQUE NOT NULL,
   full_name    text NOT NULL,
-  role         text NOT NULL CHECK (role IN ('super_admin', 'readonly_admin', 'company_admin', 'closer', 'fronter')),
+  role         text NOT NULL CHECK (role IN ('super_admin')),
   company_id   uuid REFERENCES companies(id) ON DELETE SET NULL,
-  totp_secret  text,
-  totp_enabled boolean DEFAULT false,
   is_active    boolean DEFAULT true,
   created_at   timestamptz DEFAULT now(),
   created_by   uuid REFERENCES users(id)
