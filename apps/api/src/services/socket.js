@@ -40,10 +40,7 @@ export function initSocket(httpServer) {
 
     // Buffering
     maxHttpBufferSize: 1e6, // 1MB
-    perMessageDeflate: false, // Disable for better proxy compatibility
-
-    // Parser
-    parser: require('socket.io-parser')
+    perMessageDeflate: false // Disable for better proxy compatibility
   });
 
   console.log('✅ Socket.io initialized', {
